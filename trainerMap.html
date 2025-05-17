@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="initial-scale=1.0, width=device-width" />
+    <script src="https://atlas.microsoft.com/sdk/javascript/mapcontrol/2/atlas.min.js"></script>
+    <link rel="stylesheet" href="https://atlas.microsoft.com/sdk/javascript/mapcontrol/2/atlas.min.css" />
+    <style>
+        html, body { margin: 0; padding: 0; height: 100%; width: 100%; }
+        #myMap { width: 100%; height: 100vh; }
+    </style>
+
+    <script>
+        var map;
+
+        function getMap() {
+            map = new atlas.Map('myMap', {
+                view: 'Auto',
+                center: [34.8, 32.1],
+                zoom: 10,
+                authOptions: {
+                    authType: 'subscriptionKey',
+                    subscriptionKey: 'BSDCG4i6BIsimtM5jNRtCupaIm4boJb8WM92OhKd3jL6x14l3W6mJQQJ99BEACi5YpzPSPD9AAAgAZMP337x',
+                }
+            });
+
+            map.events.add('ready', function() {
+                window.document.addEventListener('message', function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        const { type } = data;
+
+                        if (type === 'eventList') {
+
+                            const { len, events } = data;
+
+                            //const { latitude, longitude } = data;
+
+                            map.markers.clear();
+
+                            for (var i=0; i<len; i++) {
+                                
+                                const { latitude, longitude, id } = events[i];
+                                
+                                const marker = new atlas.HtmlMarker({
+                                    position: [longitude, latitude],
+                                    text: '!'
+                                });
+                                map.markers.add(marker);
+
+                            }
+                        }
+                    } catch (err) {
+                        console.error('Invalid message recieved: ', err);
+                    }
+                })
+            })
+        }
+
+    </script>
+</head>
+<body onload='getMap()'>
+    <div id="myMap" style="position:relative; width:100%; min-width:290px; height:600px;"></div>
+    
+    <div id="popupDetails" style="position:absolute;top:0;left:0;background-color:white;padding:10px;"></div>
+</body>
+</html>
