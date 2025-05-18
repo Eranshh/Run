@@ -25,6 +25,7 @@
             });
 
             map.events.add('ready', function() {
+                window.ReactNativeWebView.postMessage(JSON.stringify("{type:1, data: {status: 'ready'}}"));
                 window.document.addEventListener('message', function(event) {
                     try {
                         const data = JSON.parse(event.data);

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, Button } from 'react-native';
 import { WebView } from 'react-native-webview';
@@ -15,22 +15,89 @@ export default function App() {
     events: []
   };
 
-  const addEvent = () => {
-    eventList.events.push({latitude: 32.1 + eventList.len*0.001, longitude: 34.8 - eventList.len*0.001, runners: [], id: eventList.len});
-    eventList.len++;
+  useEffect(() => {
+  const fetchData = async () => {
+    try {
+        const response = await fetch('https://runfuncionapp.azurewebsites.net/api/getAllOpenEvents', {
+          //method: 'POST',
+          //headers: {
+          //  'Content-Type': 'application/json',
+          //},
+          //body: JSON.stringify({ name: 'Expo User' }),
+        });
+
+        const data = await response.json();
+        
+        
+        //setMessage(data.message);
+      } catch (error) {
+        console.error('Error calling Azure Function:', error);
+      }
+    };
+
+    fetchData();
+    //webViewRef.current.postMessage(JSON.stringify(eventList));
+  }, []);
+
+
+  const createEvent = async () => {
+    try {
+      const response = await fetch('https://runfuncionapp.azurewebsites.net/api/createEvent',{
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        //name: 'Expo User', // Send any data your function expects
+        timestamp: new Date().toISOString(),
+        trainerId: 'trainer12345'
+      }),
+      });
+      const data = await response.json();
+      console.log('Event created:', data);
+      eventList.events.push({latitude: 32.1 + eventList.len*0.001, longitude: 34.8 - eventList.len*0.001, runners: [], id: eventList.len});
+      eventList.len++;
+      webViewRef.current.postMessage(JSON.stringify(eventList));
+      // eventList.events.push({latitude: data.latitude, longitude: data.longitude, runners: [], id: eventList.len});
+    } catch (error) {
+      console.error('Error calling Azure Function:', error);
+      console.log('Error occurred');
+    }
   };
 
-  const sendCoords = () => {
+  const getAllOpenEvents = async () => {
+  try {
+    const response = await fetch('https://runfuncionapp.azurewebsites.net/api/getAllOpenEvents');
+    const data = await response.json();
+    console.log('Got Events:', data);
+    eventList.events = data;
+    // eventList.events = data.map((event, index) => ({
+    //   //latitude: event.latitude,
+    //   //longitude: event.longitude,
+    //   //runners: [],
+
+    //   id: index
+    // }));
     webViewRef.current.postMessage(JSON.stringify(eventList));
-  };
+    
+  } catch (error) {
+    console.error('Error calling Azure Function:', error);
+    console.log('Error occurred');
+  }
+};
 
   // Listen for messages from the map:
   const handleWebViewMessage = (event) => {
     try {
-      const data = JSON.parse(event.nativeEvent.data);
-      const { id, user } = data;
-      
-      eventList.events[id].runners.push(user);
+      const message = JSON.parse(event.nativeEvent.data);
+      const type = message.type;
+      if (type === 0) {
+        const { id, user } = data;
+        eventList.events[id].runners.push(user);
+      }
+      else{
+          webViewRef.current.postMessage(JSON.stringify(eventList));
+      }
     } catch (e) {
       console.warn('Failed to parse WebView message', e);
     }
@@ -62,7 +129,7 @@ export default function App() {
         style={{ flex: 1 }}
         onMessage={handleWebViewMessage}
         />
-        <Button title="Show Events" onPress={sendCoords}/>
+        <Button title="Show Events" onPress={getAllOpenEvents}/>
       </View>
     )
   } else if (userType === 'trainer') {
@@ -77,8 +144,8 @@ export default function App() {
         style={{ flex: 1 }}
         onMessage={handleWebViewMessage}
         />
-        <Button title="Add Event" onPress={addEvent}/>
-        <Button title="Show Events" onPress={sendCoords}/>
+        <Button title="Add Event" onPress={createEvent}/>
+        <Button title="Show Events" onPress={getAllOpenEvents}/>
       </View>
     )
   }

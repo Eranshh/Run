@@ -25,6 +25,7 @@
             });
 
             map.events.add('ready', function() {
+                window.ReactNativeWebView.postMessage(JSON.stringify("{type:1, data: {status: 'ready'}}"));
                 window.document.addEventListener('message', function(event) {
                     try {
                         const data = JSON.parse(event.data);
@@ -58,7 +59,7 @@
                                 })*/
 
                                 map.events.add('click', marker, () => { // Adds user to the event
-                                    const eventId = { id: id, user: 'runner' };
+                                    const eventId = {type:0, data: { id: id, user: 'runner' }};
                                     window.ReactNativeWebView.postMessage(JSON.stringify(eventId));
                                 })
                             }
