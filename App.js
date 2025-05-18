@@ -16,27 +16,7 @@ export default function App() {
   };
 
   useEffect(() => {
-  // const fetchData = async () => {
-  //   try {
-  //       const response = await fetch('https://runfuncionapp.azurewebsites.net/api/getAllOpenEvents', {
-  //         //method: 'POST',
-  //         //headers: {
-  //         //  'Content-Type': 'application/json',
-  //         //},
-  //         //body: JSON.stringify({ name: 'Expo User' }),
-  //       });
-
-  //       const data = await response.json();
-        
-        
-  //       //setMessage(data.message);
-  //     } catch (error) {
-  //       console.error('Error calling Azure Function:', error);
-  //     }
-  //   };
-
-    //getAllOpenEvents();
-    //webViewRef.current.postMessage(JSON.stringify(eventList));
+    // This is where you can set up any initial data or state
   }, []);
 
 
@@ -59,6 +39,57 @@ export default function App() {
       eventList.len++;
       webViewRef.current.postMessage(JSON.stringify(eventList));
       // eventList.events.push({latitude: data.latitude, longitude: data.longitude, runners: [], id: eventList.len});
+    } catch (error) {
+      console.error('Error calling Azure Function:', error);
+      console.log('Error occurred');
+    }
+  };
+
+  const deleteEvent = async (id) => {
+    try {
+      const response = await fetch('https://runfuncionapp.azurewebsites.net/api/deleteEvent',{
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        //name: 'Expo User', // Send any data your function expects
+        eventId: id
+      }),
+      });
+      const text = await response.text(); // Get raw response
+      console.log('Raw response:', text);
+      // const data = await response.json();
+      //console.log('Event deleted successfuly:', data);
+      eventList.events = eventList.events.filter(event => event.id !== message.data.eventId);
+      webViewRef.current.postMessage(JSON.stringify(eventList));
+
+    } catch (error) {
+      console.error('Error calling Azure Function:', error);
+      console.log('Error occurred');
+    }
+  };
+
+  const joinEvent = async (event_id, user_id) => {
+    try {
+      const response = await fetch('https://runfuncionapp.azurewebsites.net/api/joinEvent',{
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+
+        eventId: event_id,
+        userId: user_id
+      }),
+      });
+      const text = await response.text(); // Get raw response
+      console.log('Raw response:', text);
+      // const data = await response.json();
+      // console.log('User joined event:', data);
+      // eventList.events = eventList.events.filter(event => event.id !== message.data.eventId);
+      // webViewRef.current.postMessage(JSON.stringify(eventList));
+      
     } catch (error) {
       console.error('Error calling Azure Function:', error);
       console.log('Error occurred');
@@ -88,12 +119,17 @@ export default function App() {
   const handleWebViewMessage = (event) => {
     try {
       const message = JSON.parse(event.nativeEvent.data);
-      const type = message.type;
-      if (type === 0) {
-        const { id, user } = data;
-        eventList.events[id].runners.push(user);
+      console.log('Received message from WebView:', message);
+      if (message.data.action === "delete") {
+        console.log('Delete event:', message.data.id);
+        deleteEvent(message.data.id);
       }
-      else{
+      else if (message.data.action === "join") {
+        // const eventId = message.data.eventId;
+        joinEvent(message.data.id, "user123");
+
+
+      }else if (message.data.action === "getEvents") {
         getAllOpenEvents();
         webViewRef.current.postMessage(JSON.stringify(eventList));
       }
