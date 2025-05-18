@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, Button } from 'react-native';
 import { WebView } from 'react-native-webview';
-// import * as Location from 'expo-location';
+import * as Location from 'expo-location';
 
 export default function App() {
   const [userType, setUserType] = useState(null);
@@ -17,9 +17,21 @@ export default function App() {
 
   useEffect(() => {
     // This is where you can set up any initial data or state
-  
   }, []);
 
+
+  async function getUserLocation() {
+    let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setErrorMsg('Permission to access location was denied');
+        return;
+      }
+
+      let loc = await Location.getCurrentPositionAsync({});
+      const userLocation = {type: 'userLocation', location: loc};
+      console.log(userLocation);
+      webViewRef.current.postMessage(JSON.stringify(userLocation));
+  }
 
   const createEvent = async () => {
     try {
@@ -133,6 +145,9 @@ export default function App() {
       }else if (message.data.action === "getEvents") {
         getAllOpenEvents();
         webViewRef.current.postMessage(JSON.stringify(eventList));
+      } else if (message.data.action === "getUserLocation") {
+        console.log("sending location");
+        getUserLocation();
       }
     } catch (e) {
       console.warn('Failed to parse WebView message', e);

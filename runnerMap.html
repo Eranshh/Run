@@ -60,6 +60,18 @@
                                     document.getElementById('eventMenu').style.display = 'block';
                                 });
                             }
+
+                            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'getUserLocation'}}));
+
+                        } else if (type === 'userLocation') {
+                            const { location } = data;
+
+                            const marker = new atlas.HtmlMarker({
+                                position: [location.coords.longitude, location.coords.latitude],
+                                text: '?',
+                                color: 'Green'
+                            });
+                            map.markers.add(marker);
                         }
                     } catch (err) {
                         console.error('Invalid message recieved: ', err);
