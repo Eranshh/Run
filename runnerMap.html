@@ -33,13 +33,13 @@
 
                         if (type === 'eventList') {
 
-                            const { len, events } = data;
+                            const { events } = data;
 
                             //const { latitude, longitude } = data;
 
                             map.markers.clear();
 
-                            for (var i=0; i<len; i++) {
+                            for (var i=0; i<events.length; i++) {
                                 
                                 const { latitude, longitude, id } = events[i];
                                 
@@ -48,15 +48,6 @@
                                     text: '!'
                                 });
                                 map.markers.add(marker);
-
-                                /*map.events.add('click', marker, () => {
-                                    popup = new atlas.Popup({
-                                        content: '<div style="padding:10px;">Event id {id} has runner: {runners[0]}</div>',
-                                        position: [longitude, latitude],
-                                    });
-
-                                    popup.open(map);
-                                })*/
 
                                 map.events.add('click', marker, () => { // Adds user to the event
                                     const eventId = {type:0, data: { id: id, user: 'runner' }};
@@ -71,27 +62,10 @@
             })
         }
 
-        /*
-        function popupFunc(m) {
-            //document.getElementById('popupDetails').innerHTML += '<div id="hi">' + 'hello :)' + '</div>'
-            popup = new atlas.Popup({
-                content: '<div style="padding:10px;">Hello World</div>',
-                position: [34.8, 32.1],
-            });
-
-            popup.open(map);
-
-            map.events.add("click", popup, sayHi);
-        }
-
-        function sayHi(m) {
-            document.getElementById('popupDetails').innerHTML += '<div id="hi">' + 'hello :)' + '</div>'
-        } */
     </script>
 </head>
 <body onload='getMap()'>
     <div id="myMap" style="position:relative; width:100%; min-width:290px; height:600px;"></div>
     
-    <div id="popupDetails" style="position:absolute;top:0;left:0;background-color:white;padding:10px;"></div>
 </body>
 </html>

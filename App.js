@@ -16,26 +16,26 @@ export default function App() {
   };
 
   useEffect(() => {
-  const fetchData = async () => {
-    try {
-        const response = await fetch('https://runfuncionapp.azurewebsites.net/api/getAllOpenEvents', {
-          //method: 'POST',
-          //headers: {
-          //  'Content-Type': 'application/json',
-          //},
-          //body: JSON.stringify({ name: 'Expo User' }),
-        });
+  // const fetchData = async () => {
+  //   try {
+  //       const response = await fetch('https://runfuncionapp.azurewebsites.net/api/getAllOpenEvents', {
+  //         //method: 'POST',
+  //         //headers: {
+  //         //  'Content-Type': 'application/json',
+  //         //},
+  //         //body: JSON.stringify({ name: 'Expo User' }),
+  //       });
 
-        const data = await response.json();
+  //       const data = await response.json();
         
         
-        //setMessage(data.message);
-      } catch (error) {
-        console.error('Error calling Azure Function:', error);
-      }
-    };
+  //       //setMessage(data.message);
+  //     } catch (error) {
+  //       console.error('Error calling Azure Function:', error);
+  //     }
+  //   };
 
-    fetchData();
+    //getAllOpenEvents();
     //webViewRef.current.postMessage(JSON.stringify(eventList));
   }, []);
 
@@ -70,14 +70,12 @@ export default function App() {
     const response = await fetch('https://runfuncionapp.azurewebsites.net/api/getAllOpenEvents');
     const data = await response.json();
     console.log('Got Events:', data);
-    eventList.events = data;
-    // eventList.events = data.map((event, index) => ({
-    //   //latitude: event.latitude,
-    //   //longitude: event.longitude,
-    //   //runners: [],
-
-    //   id: index
-    // }));
+    // eventList.events = data;
+    eventList.events = data.map((event) => ({
+      latitude: 32.1,
+      longitude: 34.8,
+      id: event.eventId,
+    }));
     webViewRef.current.postMessage(JSON.stringify(eventList));
     
   } catch (error) {
@@ -96,7 +94,8 @@ export default function App() {
         eventList.events[id].runners.push(user);
       }
       else{
-          webViewRef.current.postMessage(JSON.stringify(eventList));
+        getAllOpenEvents();
+        webViewRef.current.postMessage(JSON.stringify(eventList));
       }
     } catch (e) {
       console.warn('Failed to parse WebView message', e);

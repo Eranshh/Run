@@ -33,13 +33,13 @@
 
                         if (type === 'eventList') {
 
-                            const { len, events } = data;
+                            const { events } = data;
 
                             //const { latitude, longitude } = data;
 
                             map.markers.clear();
 
-                            for (var i=0; i<len; i++) {
+                            for (var i=0; i<events.length; i++) {
                                 
                                 const { latitude, longitude, id } = events[i];
                                 
@@ -63,6 +63,5 @@
 <body onload='getMap()'>
     <div id="myMap" style="position:relative; width:100%; min-width:290px; height:600px;"></div>
     
-    <div id="popupDetails" style="position:absolute;top:0;left:0;background-color:white;padding:10px;"></div>
 </body>
 </html>
