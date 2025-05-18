@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, Button } from 'react-native';
 import { WebView } from 'react-native-webview';
+// import * as Location from 'expo-location';
 
 export default function App() {
   const [userType, setUserType] = useState(null);
@@ -11,12 +12,12 @@ export default function App() {
   // Handle events:
   var eventList = {
     type: 'eventList',
-    len: 0,
     events: []
   };
 
   useEffect(() => {
     // This is where you can set up any initial data or state
+  
   }, []);
 
 
@@ -30,7 +31,7 @@ export default function App() {
       body: JSON.stringify({
         //name: 'Expo User', // Send any data your function expects
         timestamp: new Date().toISOString(),
-        trainerId: 'trainer12345'
+        trainerId: 'user456'
       }),
       });
       const data = await response.json();
