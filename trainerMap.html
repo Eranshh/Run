@@ -39,16 +39,26 @@
 
                             map.markers.clear();
 
-                            for (var i=0; i<events.length; i++) {
-                                
-                                const { latitude, longitude, id } = events[i];
-                                
+                            for (let i = 0; i < events.length; i++) {
+                                const { latitude, longitude, id, title } = events[i];
+
                                 const marker = new atlas.HtmlMarker({
                                     position: [longitude, latitude],
                                     text: '!'
                                 });
                                 map.markers.add(marker);
 
+                                // Capture event info for this marker
+                                map.events.add('click', marker, () => {
+                                    // Show event data in the menu
+                                    document.getElementById('eventDetails').textContent = `Event ID: ${id}, Title: ${title || 'Untitled'}`;
+
+                                    // Store the current event ID for the buttons to use
+                                    window.selectedEventId = id;
+
+                                    // Show the menu
+                                    document.getElementById('eventMenu').style.display = 'block';
+                                });
                             }
 
                             window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'getUserLocation'}}));
@@ -70,10 +80,36 @@
             })
         }
 
+        function handleJoin() {
+        const message = {
+            data: {
+                id: window.selectedEventId,
+                action: 'join'
+            }
+        };
+        window.ReactNativeWebView.postMessage(JSON.stringify(message));
+    }
+
+        function handleDelete() {
+            consloe.log("yes")
+            const message = {
+                data: {
+                    id: window.selectedEventId,
+                    action: 'delete'
+                }
+            };
+            window.ReactNativeWebView.postMessage(JSON.stringify(message));
+            getElementById('eventMenu').style.display = 'none';
+        }
     </script>
 </head>
 <body onload='getMap()'>
     <div id="myMap" style="position:relative; width:100%; min-width:290px; height:600px;"></div>
+    <div id="eventMenu" style="display:none; padding:15px; background:#f8f8f8; border-top:1px solid #ccc;">
+    <p id="eventDetails"></p>
+    <button onclick="handleJoin()">Join</button>
+    <button onclick="handleDelete()">Delete</button>
+    </div>
     
 </body>
 </html>

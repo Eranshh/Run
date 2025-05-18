@@ -70,11 +70,11 @@ export default function App() {
         eventId: id
       }),
       });
-      const text = await response.text(); // Get raw response
-      console.log('Raw response:', text);
-      // const data = await response.json();
-      //console.log('Event deleted successfuly:', data);
-      eventList.events = eventList.events.filter(event => event.id !== message.data.eventId);
+      // const text = await response.text(); // Get raw response
+      // console.log('Raw response:', text);
+      const data = await response.json();
+      console.log('Event deleted successfuly:', data);
+      eventList.events = eventList.events.filter(event => event.id !== data.eventId);
       webViewRef.current.postMessage(JSON.stringify(eventList));
 
     } catch (error) {
@@ -112,6 +112,26 @@ export default function App() {
   const getAllOpenEvents = async () => {
   try {
     const response = await fetch('https://runfuncionapp.azurewebsites.net/api/getAllOpenEvents');
+    const data = await response.json();
+    console.log('Got Events:', data);
+    // eventList.events = data;
+    eventList.events = data.map((event) => ({
+      latitude: 32.1,
+      longitude: 34.8,
+      id: event.eventId,
+    }));
+    webViewRef.current.postMessage(JSON.stringify(eventList));
+    
+  } catch (error) {
+    console.error('Error calling Azure Function:', error);
+    console.log('Error occurred');
+  }
+};
+
+ const getUsersEvents = async () => {
+  try {
+    const userId = "user123"; // Replace with the actual user ID
+    const response = await fetch(`https://runfuncionapp.azurewebsites.net/api/getUsersEvents?userId=${encodeURIComponent(userId)}`);
     const data = await response.json();
     console.log('Got Events:', data);
     // eventList.events = data;
@@ -180,7 +200,8 @@ export default function App() {
         style={{ flex: 1 }}
         onMessage={handleWebViewMessage}
         />
-        <Button title="Show Events" onPress={getAllOpenEvents}/>
+        <Button title="Show All Events" onPress={getAllOpenEvents}/>
+        <Button title="Show My Events" onPress={getUsersEvents}/>
       </View>
     )
   } else if (userType === 'trainer') {
@@ -196,7 +217,7 @@ export default function App() {
         onMessage={handleWebViewMessage}
         />
         <Button title="Add Event" onPress={createEvent}/>
-        <Button title="Show Events" onPress={getAllOpenEvents}/>
+        <Button title="Show All Events" onPress={getAllOpenEvents}/>
       </View>
     )
   }
