@@ -53,21 +53,10 @@
 
             map.events.add('ready', function() {
                 //window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Map ready'}}));
-                console.log('Map ready');
+                //console.log('Map ready');
+
                  // Wait a short moment to ensure the camera is settled
-                setTimeout(() => {
-                    map.events.add('cameraChanged', () => {
-                        window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Map camera changed'}}));
-                        console.log("Camera changed");
-                    });
-
-                    map.events.add('moveend', () => {
-                        window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Map moved'}}));
-                    });
-
-                    //window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Camera + move listeners added'}}));
-                }, 5000);
-                //window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'getEvents'}}));
+                window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'getEvents'}}));
                 window.document.addEventListener('message', function(event) {
                     try {
                         const data = JSON.parse(event.data);
@@ -199,21 +188,22 @@
         }
 
         // Move the marker as the map moves
-        console.log("Binding cameraChanged event...");
-        map.events.add('cameraChanged', map, updateMarkerPosition);
+        console.log("Binding move event...");
+        map.events.add('move', updateMarkerPosition);
     }
 
     function updateMarkerPosition() {
         if (trackingCenter && tempMarker) {
             const center = map.getCamera().center;
             console.log("Map moved. Center is:", center);
+            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Map moved'}}));
             tempMarker.setOptions({ position: center });
         }
     }
 
     function confirmLocation() {
         trackingCenter = false;
-        map.events.remove('cameraChanged', map, updateMarkerPosition);
+        map.events.remove('move', updateMarkerPosition);
 
         const pos = tempMarker.getOptions().position;
         document.getElementById('eventLatitude').value = pos[1].toFixed(6);
@@ -234,7 +224,11 @@
     <button onclick="handleDelete()">Delete</button>
     </div>
     <button id="addEventBtn" onclick="toggleAddEventForm()">+</button>
-    <button id="confirmLocationBtn" style="display:none; position: fixed; bottom: 90px; right: 20px; z-index: 1000;">Confirm Location</button>
+    <button id="confirmLocationBtn"
+        onclick="confirmLocation()"
+        style="display:none; position: fixed; bottom: 90px; right: 20px; z-index: 1000;">
+        Confirm Location
+    </button>
 
 <div id="addEventForm" style="display:none;">
     <h3>Add New Event</h3>
