@@ -3,21 +3,48 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="initial-scale=1.0, width=device-width" />
-    <script src="https://atlas.microsoft.com/sdk/javascript/mapcontrol/2/atlas.min.js"></script>
-    <link rel="stylesheet" href="https://atlas.microsoft.com/sdk/javascript/mapcontrol/2/atlas.min.css" />
+    <script src="https://atlas.microsoft.com/sdk/javascript/mapcontrol/3/atlas.min.js"></script>
+    <link rel="stylesheet" href="https://atlas.microsoft.com/sdk/javascript/mapcontrol/3/atlas.min.css" />
     <style>
         html, body { margin: 0; padding: 0; height: 100%; width: 100%; }
         #myMap { width: 100%; height: 100vh; }
+
+        #addEventBtn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            font-size: 32px;
+            background-color: #0078D4;
+            color: white;
+            border: none;
+            cursor: pointer;
+            z-index: 1000;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+
+        #addEventForm {
+            position: fixed;
+            bottom: 90px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border: 1px solid #ccc;
+            z-index: 1000;
+            width: 250px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
     </style>
 
     <script>
-        var map;
-
+        let map;
         function getMap() {
             map = new atlas.Map('myMap', {
-                view: 'Auto',
                 center: [34.8, 32.1],
                 zoom: 10,
+                view: 'Auto',
                 authOptions: {
                     authType: 'subscriptionKey',
                     subscriptionKey: 'BSDCG4i6BIsimtM5jNRtCupaIm4boJb8WM92OhKd3jL6x14l3W6mJQQJ99BEACi5YpzPSPD9AAAgAZMP337x',
@@ -25,7 +52,22 @@
             });
 
             map.events.add('ready', function() {
-                window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'getEvents'}}));
+                //window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Map ready'}}));
+                console.log('Map ready');
+                 // Wait a short moment to ensure the camera is settled
+                setTimeout(() => {
+                    map.events.add('cameraChanged', () => {
+                        window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Map camera changed'}}));
+                        console.log("Camera changed");
+                    });
+
+                    map.events.add('moveend', () => {
+                        window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Map moved'}}));
+                    });
+
+                    //window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Camera + move listeners added'}}));
+                }, 5000);
+                //window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'getEvents'}}));
                 window.document.addEventListener('message', function(event) {
                     try {
                         const data = JSON.parse(event.data);
@@ -61,7 +103,7 @@
                                 });
                             }
 
-                            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'getUserLocation'}}));
+                            //window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'getUserLocation'}}));
 
                         } else if (type === 'userLocation') {
                             const { location } = data;
@@ -99,16 +141,109 @@
             window.ReactNativeWebView.postMessage(JSON.stringify(message));
             getElementById('eventMenu').style.display = 'none';
         }
+
+    function toggleAddEventForm() {
+        const form = document.getElementById('addEventForm');
+        form.style.display = form.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function submitEvent() {
+        const title = document.getElementById('eventTitle').value;
+        const latitude = parseFloat(document.getElementById('eventLatitude').value);
+        const longitude = parseFloat(document.getElementById('eventLongitude').value);
+
+        if (!title || isNaN(latitude) || isNaN(longitude)) {
+            alert('Please fill all fields correctly.');
+            return;
+        }
+
+        const newEvent = {
+            title,
+            latitude,
+            longitude
+        };
+
+        // Send to React Native or your backend as needed
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+            data: {
+                action: 'addEvent',
+                event: newEvent
+            }
+        }));
+
+        toggleAddEventForm();
+    }
+
+    let tempMarker = null;
+    let trackingCenter = false;
+
+    function startLocationSelection() {
+        // Hide the form and show the confirm button
+        document.getElementById('addEventForm').style.display = 'none';
+        document.getElementById('confirmLocationBtn').style.display = 'inline';
+
+        trackingCenter = true;
+
+        // Drop a marker at the current center
+        const center = map.getCamera().center;
+
+        if (!tempMarker) {
+            tempMarker = new atlas.HtmlMarker({
+                position: center,
+                draggable: false,
+                color: 'DodgerBlue'
+            });
+            map.markers.add(tempMarker);
+        } else {
+            tempMarker.setOptions({ position: center });
+        }
+
+        // Move the marker as the map moves
+        console.log("Binding cameraChanged event...");
+        map.events.add('cameraChanged', map, updateMarkerPosition);
+    }
+
+    function updateMarkerPosition() {
+        if (trackingCenter && tempMarker) {
+            const center = map.getCamera().center;
+            console.log("Map moved. Center is:", center);
+            tempMarker.setOptions({ position: center });
+        }
+    }
+
+    function confirmLocation() {
+        trackingCenter = false;
+        map.events.remove('cameraChanged', map, updateMarkerPosition);
+
+        const pos = tempMarker.getOptions().position;
+        document.getElementById('eventLatitude').value = pos[1].toFixed(6);
+        document.getElementById('eventLongitude').value = pos[0].toFixed(6);
+
+        // Hide confirm button and show form again
+        document.getElementById('confirmLocationBtn').style.display = 'none';
+        document.getElementById('addEventForm').style.display = 'block';
+    }
     </script>
 </head>
-<body onload='getMap()'>
-    <div id="myMap" style="position:relative; width:100%; min-width:290px; height:600px;"></div>
+<body onload="getMap()">
+    <div id="myMap"></div>
 
     <div id="eventMenu" style="display:none; padding:15px; background:#f8f8f8; border-top:1px solid #ccc;">
     <p id="eventDetails"></p>
     <button onclick="handleJoin()">Join</button>
     <button onclick="handleDelete()">Delete</button>
+    </div>
+    <button id="addEventBtn" onclick="toggleAddEventForm()">+</button>
+    <button id="confirmLocationBtn" style="display:none; position: fixed; bottom: 90px; right: 20px; z-index: 1000;">Confirm Location</button>
+
+<div id="addEventForm" style="display:none;">
+    <h3>Add New Event</h3>
+    <input type="text" id="eventTitle" placeholder="Event Title" /><br />
+    <input type="text" id="eventLatitude" placeholder="Latitude" readonly /><br />
+    <input type="text" id="eventLongitude" placeholder="Longitude" readonly /><br />
+    <button type="button" onclick="startLocationSelection()">Choose Location on Map</button>
+    <button onclick="submitEvent()">Submit</button>
+    <button onclick="toggleAddEventForm()">Cancel</button>
 </div>
-    
 </body>
 </html>

@@ -168,6 +168,16 @@ export default function App() {
       } else if (message.data.action === "getUserLocation") {
         console.log("sending location");
         getUserLocation();
+      }else if (message.data.action === "addEvent") {
+          console.log("creating event");
+          createEvent(message.data.newEvent);
+      } else if (message.data.action === "log"){
+        //console.log("log message");
+        console.log(message.data.message);
+      }
+      
+      else {
+        console.warn('Unknown action:', message.data.action);
       }
     } catch (e) {
       console.warn('Failed to parse WebView message', e);
@@ -188,7 +198,7 @@ export default function App() {
         </View>
       </View>
     );
-  } else if (userType === 'runner') {
+  } 
     return (
       <View style={{flex: 1}}>
         <WebView
@@ -202,25 +212,9 @@ export default function App() {
         />
         <Button title="Show All Events" onPress={getAllOpenEvents}/>
         <Button title="Show My Events" onPress={getUsersEvents}/>
-      </View>
-    )
-  } else if (userType === 'trainer') {
-    return (
-      <View style={{flex: 1}}>
-        <WebView
-        ref={webViewRef}
-        originWhitelist={['*']}
-        source={require('./trainerMap.html')}
-        javaScriptEnabled={true}
-        domStorageEnabled={true}
-        style={{ flex: 1 }}
-        onMessage={handleWebViewMessage}
-        />
         <Button title="Add Event" onPress={createEvent}/>
-        <Button title="Show All Events" onPress={getAllOpenEvents}/>
       </View>
     )
-  }
 }
 
 const styles = StyleSheet.create({
