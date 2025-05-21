@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@expo/metro-runtime": "~5.0.4",
+    "@microsoft/signalr": "^8.0.7",
     "@react-native-community/geolocation": "^3.4.0",
     "expo": "^53.0.9",
     "expo-location": "^18.1.5",

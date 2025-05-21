@@ -3,9 +3,11 @@ import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, Button } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
+import * as SignalR from '@microsoft/signalr';
 
 export default function App() {
   const [userType, setUserType] = useState(null);
+  const [connection, setConnection] = useState(null);
   
   const webViewRef = useRef(null);
 
@@ -16,7 +18,41 @@ export default function App() {
   };
 
   useEffect(() => {
-    // This is where you can set up any initial data or state
+    const connectToSignalR = async () => {
+      try {
+        // STEP 1: Call backend negotiate endpoint to get URL + token
+        const res = await fetch("https://runfuncionapp.azurewebsites.net/api/negotiate");
+        if (!res.ok) throw new Error("Failed to fetch SignalR info");
+
+        const { url, accessToken } = await res.json();
+
+        // STEP 2: Use the returned info to connect
+        const signalrConnection = new SignalR.HubConnectionBuilder()
+          .withUrl(url, {
+            accessTokenFactory: () => accessToken,
+          })
+          .withAutomaticReconnect()
+          .configureLogging(SignalR.LogLevel.Information)
+          .build();
+
+        // STEP 3: Set up listeners
+        signalrConnection.on("addEvent", (message) => {
+          console.log("Received message from SignalR:", message);
+        });
+
+        signalrConnection.onclose(() => {
+          console.log("SignalR connection closed.");
+        });
+
+        await signalrConnection.start();
+        console.log("SignalR connected.");
+        setConnection(signalrConnection);
+      } catch (error) {
+        console.error("SignalR setup failed:", error);
+      }
+    };
+
+    connectToSignalR();
   }, []);
 
 
