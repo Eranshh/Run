@@ -53,21 +53,40 @@ export default function App() {
     };
 
     connectToSignalR();
-  }, []);
 
 
-  async function getUserLocation() {
-    let { status } = await Location.requestForegroundPermissionsAsync();
+    // Request location and track it:
+    let watcher;
+
+    const startWatchingLocation = async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        setErrorMsg('Permission to access location was denied');
+        console.warn('Permission to access location was denied');
         return;
       }
 
-      let loc = await Location.getCurrentPositionAsync({});
-      const userLocation = {type: 'userLocation', location: loc};
-      console.log(userLocation);
-      webViewRef.current.postMessage(JSON.stringify(userLocation));
-  }
+      watcher = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.High,
+          timeInterval: 3000,
+          distanceInterval: 5,
+        },
+        (location) => {
+          // Send updated location to the WebView
+          webViewRef.current?.postMessage(
+            JSON.stringify({ type: 'userLocation', location })
+          );
+        }
+      );
+    };
+
+    startWatchingLocation();
+
+    return () => {
+      if (watcher) watcher.remove();
+    };
+  }, []);
+
 
   const createEvent = async () => {
     try {
