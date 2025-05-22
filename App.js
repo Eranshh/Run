@@ -38,6 +38,10 @@ export default function App() {
         // STEP 3: Set up listeners
         signalrConnection.on("addEvent", (message) => {
           console.log("Received message from SignalR:", message);
+          console.log("adding event to map");
+          eventList.events.push({latitude: 32.1 + eventList.len*0.001, longitude: 34.8 - eventList.len*0.001, runners: [], id: eventList.len});
+          eventList.len++;
+          webViewRef.current.postMessage(JSON.stringify(eventList));
         });
 
         signalrConnection.onclose(() => {
