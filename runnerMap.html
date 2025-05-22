@@ -72,6 +72,50 @@
             background-color: #ccc;
             color: black;
         }
+        #userBtn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            font-size: 24px;
+            background-color: white;
+            color: #333;
+            border: 1px solid #ccc;
+            cursor: pointer;
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        #userMenu {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        #userCard {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            padding: 15px 20px;
+            width: 250px;
+            transition: all 0.3s ease;
+        }
+
+        #userCard h3, #userCard h4 {
+            margin: 10px 0 5px;
+        }
+
+        #userCard ul {
+            padding-left: 20px;
+            margin: 0;
+        }
+
+        #userCard li {
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
     </style>
 
     <script>
@@ -97,13 +141,12 @@
                     try {
                         const data = JSON.parse(event.data);
                         const { type } = data;
-
+                        
                         if (type === 'eventList') {
 
                             const { events } = data;
 
-                            //const { latitude, longitude } = data;
-
+                            // Clear existing markers
                             if (!window.eventMarkers) {
                                 window.eventMarkers = [];
                             } else {
@@ -111,29 +154,41 @@
                                 window.eventMarkers = [];
                             }
 
+                            // Store my events
+                            window.myEvents = [];
+
                             for (let i = 0; i < events.length; i++) {
-                                const { latitude, longitude, id, title } = events[i];
+                                const { latitude, longitude, id, title, userId } = events[i];
 
                                 const marker = new atlas.HtmlMarker({
                                     position: [longitude, latitude],
                                     text: '!'
                                 });
+
                                 map.markers.add(marker);
                                 window.eventMarkers.push(marker);
 
-                                // Capture event info for this marker
                                 map.events.add('click', marker, () => {
-                                    window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Marker clicked'}}));
-
-                                    // Store the current event ID for the buttons to use
-                                    window.selectedEventId = id;
-
-                                    // Show the menu
                                     document.getElementById('eventTitleDisplay').textContent = title || 'Untitled';
                                     document.getElementById('eventCoords').textContent = `Lat: ${latitude}, Lng: ${longitude}`;
+                                    window.selectedEventId = id;
                                     document.getElementById('eventMenu').style.display = 'block';
                                 });
+
+                                // For now, fake current user as 'me'
+                                if (userId === 'me') {
+                                    window.myEvents.push({ id, title });
+                                }
                             }
+
+                        // Update the "My Events" list
+                        const list = document.getElementById('myEventsList');
+                        list.innerHTML = '';
+                        window.myEvents.forEach(evt => {
+                            const li = document.createElement('li');
+                            li.textContent = evt.title || '(Untitled)';
+                            list.appendChild(li);
+                        });
 
                         } else if (type === 'userLocation') {
                             const { location } = data;
@@ -263,6 +318,14 @@
     function closeEventMenu() {
         document.getElementById('eventMenu').style.display = 'none';
     }
+    function toggleUserMenu() {
+        const menu = document.getElementById('userMenu');
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function closeUserMenu() {
+        document.getElementById('userMenu').style.display = 'none';
+    }
     </script>
 </head>
 <body onload="getMap()">
@@ -292,6 +355,18 @@
     <button type="button" onclick="startLocationSelection()">Choose Location on Map</button>
     <button onclick="submitEvent()">Submit</button>
     <button onclick="toggleAddEventForm()">Cancel</button>
+</div>
+<button id="userBtn" onclick="toggleUserMenu()">👤</button>
+<div id="userMenu" style="display:none;">
+    <div id="userCard">
+        <h3>User Info</h3>
+        <p>(Not signed in)</p>
+
+        <h4>My Events</h4>
+        <ul id="myEventsList"></ul>
+
+        <button onclick="closeUserMenu()">Close</button>
+    </div>
 </div>
 </body>
 </html>
