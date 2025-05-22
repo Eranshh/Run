@@ -36,6 +36,42 @@
             width: 250px;
             box-shadow: 0 4px 8px rgba(0,0,0,0.2);
         }
+        #eventMenu {
+            position: fixed;
+            bottom: 90px;
+            left: 20px;
+            z-index: 1000;
+            display: none;
+        }
+
+        #eventCard {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            padding: 15px 20px;
+            width: 250px;
+            transition: all 0.3s ease;
+        }
+
+        #eventCard h3 {
+            margin: 0 0 10px;
+        }
+
+        #eventCard button {
+            margin-right: 10px;
+            margin-top: 10px;
+            padding: 5px 10px;
+            border: none;
+            border-radius: 6px;
+            background-color: #0078D4;
+            color: white;
+            cursor: pointer;
+        }
+
+        #eventCard button:last-child {
+            background-color: #ccc;
+            color: black;
+        }
     </style>
 
     <script>
@@ -87,13 +123,14 @@
 
                                 // Capture event info for this marker
                                 map.events.add('click', marker, () => {
-                                    // Show event data in the menu
-                                    document.getElementById('eventDetails').textContent = `Event ID: ${id}, Title: ${title || 'Untitled'}`;
+                                    window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Marker clicked'}}));
 
                                     // Store the current event ID for the buttons to use
                                     window.selectedEventId = id;
 
                                     // Show the menu
+                                    document.getElementById('eventTitleDisplay').textContent = title || 'Untitled';
+                                    document.getElementById('eventCoords').textContent = `Lat: ${latitude}, Lng: ${longitude}`;
                                     document.getElementById('eventMenu').style.display = 'block';
                                 });
                             }
@@ -223,15 +260,22 @@
         document.getElementById('confirmLocationBtn').style.display = 'none';
         document.getElementById('addEventForm').style.display = 'block';
     }
+    function closeEventMenu() {
+        document.getElementById('eventMenu').style.display = 'none';
+    }
     </script>
 </head>
 <body onload="getMap()">
     <div id="myMap"></div>
 
-    <div id="eventMenu" style="display:none; padding:15px; background:#f8f8f8; border-top:1px solid #ccc;">
-    <p id="eventDetails"></p>
-    <button onclick="handleJoin()">Join</button>
-    <button onclick="handleDelete()">Delete</button>
+    <div id="eventMenu" style="display: none;">
+        <div id="eventCard">
+            <h3 id="eventTitleDisplay">Event Title</h3>
+            <p id="eventCoords"></p>
+            <button onclick="handleJoin()">Join</button>
+            <button onclick="handleDelete()">Delete</button>
+            <button onclick="closeEventMenu()">Close</button>
+        </div>
     </div>
     <button id="addEventBtn" onclick="toggleAddEventForm()">+</button>
     <button id="confirmLocationBtn"
