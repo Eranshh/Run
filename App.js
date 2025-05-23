@@ -39,7 +39,7 @@ export default function App() {
         signalrConnection.on("addEvent", (message) => {
           console.log("Received message from SignalR:", message);
           console.log("adding event to map");
-          eventList.events.push({latitude: 32.1 + eventList.len*0.001, longitude: 34.8 - eventList.len*0.001, runners: [], id: eventList.len});
+          eventList.events.push({latitude: data.latitude, longitude: data.longitude, runners: [], id: eventList.len});
           eventList.len++;
           webViewRef.current.postMessage(JSON.stringify(eventList));
         });
@@ -107,7 +107,7 @@ export default function App() {
       });
       const data = await response.json();
       console.log('Event created:', data);
-      eventList.events.push({latitude: 32.1 + eventList.len*0.001, longitude: 34.8 - eventList.len*0.001, runners: [], id: eventList.len});
+      eventList.events.push({latitude: data.latitude, longitude: data.longitude, runners: [], id: eventList.len});
       eventList.len++;
       webViewRef.current.postMessage(JSON.stringify(eventList));
       // eventList.events.push({latitude: data.latitude, longitude: data.longitude, runners: [], id: eventList.len});
@@ -175,8 +175,8 @@ export default function App() {
     console.log('Got Events:', data);
     // eventList.events = data;
     eventList.events = data.map((event) => ({
-      latitude: 32.1,
-      longitude: 34.8,
+      latitude: event.latitude,
+      longitude: event.longitude,
       id: event.eventId,
     }));
     webViewRef.current.postMessage(JSON.stringify(eventList));
@@ -195,8 +195,8 @@ export default function App() {
     console.log('Got Events:', data);
     // eventList.events = data;
     eventList.events = data.map((event) => ({
-      latitude: 32.1,
-      longitude: 34.8,
+      latitude: event.latitude,
+      longitude: event.longitude,
       id: event.eventId,
     }));
     webViewRef.current.postMessage(JSON.stringify(eventList));
