@@ -37,12 +37,26 @@ export default function App() {
 
         // STEP 3: Set up listeners
         signalrConnection.on("addEvent", (message) => {
+        try {
           console.log("Received message from SignalR:", message);
-          console.log("adding event to map");
-          eventList.events.push({latitude: data.latitude, longitude: data.longitude, runners: [], id: eventList.len});
-          eventList.len++;
+          const event_data = typeof message === 'string' ? JSON.parse(message) : message;
+
+          // Add event to the local event list
+          eventList.events.push({
+            latitude: event_data.latitude,
+            longitude: event_data.longitude,
+            runners: [],
+            id: event_data.eventId
+          });
+
+          eventList.len = (eventList.len || 0) + 1;
+
+          // Send updated list to WebView
           webViewRef.current.postMessage(JSON.stringify(eventList));
-        });
+        } catch (err) {
+          console.error("Error parsing SignalR event message:", err);
+        }
+      });
 
         signalrConnection.onclose(() => {
           console.log("SignalR connection closed.");
@@ -92,7 +106,7 @@ export default function App() {
   }, []);
 
 
-  const createEvent = async () => {
+  const createEvent = async (event) => {
     try {
       const response = await fetch('https://runfuncionapp.azurewebsites.net/api/createEvent',{
       method: 'POST',
@@ -101,15 +115,19 @@ export default function App() {
       },
       body: JSON.stringify({
         //name: 'Expo User', // Send any data your function expects
+        //TODO: add event name
         timestamp: new Date().toISOString(),
+        latitude: event.latitude,
+        longitude: event.longitude,
         trainerId: 'user456'
       }),
       });
       const data = await response.json();
       console.log('Event created:', data);
-      eventList.events.push({latitude: data.latitude, longitude: data.longitude, runners: [], id: eventList.len});
-      eventList.len++;
-      webViewRef.current.postMessage(JSON.stringify(eventList));
+      // signalr will handle this
+      // eventList.events.push({latitude: data.latitude, longitude: data.longitude, runners: [], id: eventList.len});
+      // eventList.len++;
+      // webViewRef.current.postMessage(JSON.stringify(eventList));
       // eventList.events.push({latitude: data.latitude, longitude: data.longitude, runners: [], id: eventList.len});
     } catch (error) {
       console.error('Error calling Azure Function:', error);
@@ -229,7 +247,8 @@ export default function App() {
         getUserLocation();
       }else if (message.data.action === "addEvent") {
           console.log("creating event");
-          createEvent(message.data.newEvent);
+          console.log(message.data.event);
+          createEvent(message.data.event);
       } else if (message.data.action === "log"){
         //console.log("log message");
         console.log(message.data.message);
