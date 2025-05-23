@@ -38,6 +38,9 @@ export default function App() {
         // STEP 3: Set up listeners
         signalrConnection.on("addEvent", (message) => {
           console.log("Received message from SignalR:", message);
+          eventList.events.push({latitude: 32.1, longitude: 34.8, runners: [], id: message.RowKey});
+          eventList.len++;
+          webViewRef.current.postMessage(JSON.stringify(eventList));
         });
 
         signalrConnection.onclose(() => {
@@ -54,7 +57,9 @@ export default function App() {
 
     connectToSignalR();
 
+  }, []);
 
+  useEffect(() => {
     // Request location and track it:
     let watcher;
 
@@ -103,7 +108,7 @@ export default function App() {
       });
       const data = await response.json();
       console.log('Event created:', data);
-      eventList.events.push({latitude: 32.1 + eventList.len*0.001, longitude: 34.8 - eventList.len*0.001, runners: [], id: eventList.len});
+      eventList.events.push({latitude: 32.1, longitude: 34.8, runners: [], id: eventList.len});
       eventList.len++;
       webViewRef.current.postMessage(JSON.stringify(eventList));
       // eventList.events.push({latitude: data.latitude, longitude: data.longitude, runners: [], id: eventList.len});
