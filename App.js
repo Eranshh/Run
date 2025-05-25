@@ -58,6 +58,7 @@ export default function App() {
         }
       });
 
+
         signalrConnection.onclose(() => {
           console.log("SignalR connection closed.");
         });
@@ -72,7 +73,9 @@ export default function App() {
 
     connectToSignalR();
 
+  }, []);
 
+  useEffect(() => {
     // Request location and track it:
     let watcher;
 
@@ -124,6 +127,7 @@ export default function App() {
       });
       const data = await response.json();
       console.log('Event created:', data);
+      
       // signalr will handle this
       // eventList.events.push({latitude: data.latitude, longitude: data.longitude, runners: [], id: eventList.len});
       // eventList.len++;
