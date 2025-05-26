@@ -329,9 +329,11 @@ export default function App() {
           style={{ flex: 1 }}
           onMessage={handleWebViewMessage}
           />
-          <TouchableOpacity style={styles.fab} onPress={openEventSheet}>
-            <Text style={styles.fabText}>+</Text>
-          </TouchableOpacity>
+          {!isSelectingLocation && (
+            <TouchableOpacity style={styles.fab} onPress={openEventSheet}>
+              <Text style={styles.fabText}>+</Text>
+            </TouchableOpacity>
+          )}
           {isSheetVisible && (
             <CreateEventSheet
               ref={sheetRef}
