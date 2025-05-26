@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View, Button } from 'react-native';
+import { StyleSheet, Text, View, Button, TouchableOpacity } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
@@ -329,7 +329,9 @@ export default function App() {
           style={{ flex: 1 }}
           onMessage={handleWebViewMessage}
           />
-          <Button title="Add Event" onPress={openEventSheet} />
+          <TouchableOpacity style={styles.fab} onPress={openEventSheet}>
+            <Text style={styles.fabText}>+</Text>
+          </TouchableOpacity>
           {isSheetVisible && (
             <CreateEventSheet
               ref={sheetRef}
@@ -356,5 +358,27 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: 30,
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#0078D4',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 5,
+    zIndex: 1000,
+  },
+  fabText: {
+    color: 'white',
+    fontSize: 32,
+    lineHeight: 32,
   },
 });

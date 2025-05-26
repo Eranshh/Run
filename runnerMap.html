@@ -9,7 +9,7 @@
         html, body { margin: 0; padding: 0; height: 100%; width: 100%; }
         #myMap { width: 100%; height: 100vh; }
 
-        #addEventBtn {
+        .reactAddEventBtn  {
             position: fixed;
             bottom: 20px;
             right: 20px;
@@ -24,18 +24,22 @@
             z-index: 1000;
             box-shadow: 0 4px 8px rgba(0,0,0,0.3);
         }
-
-        #addEventForm {
+        #confirmLocationBtn {
             position: fixed;
             bottom: 90px;
             right: 20px;
-            background: white;
-            padding: 15px;
-            border: 1px solid #ccc;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            font-size: 28px;
+            background-color: #28A745;
+            color: white;
+            border: none;
+            cursor: pointer;
             z-index: 1000;
-            width: 250px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
         }
+
         #eventMenu {
             position: fixed;
             bottom: 90px;
@@ -241,52 +245,11 @@
             window.ReactNativeWebView.postMessage(JSON.stringify(message));
             getElementById('eventMenu').style.display = 'none';
         }
-
-    function toggleAddEventForm() {
-        const form = document.getElementById('addEventForm');
-        form.style.display = form.style.display === 'none' ? 'block' : 'none';
-    }
-
-    function submitEvent() {
-        const title = document.getElementById('eventTitle').value;
-        const latitude = parseFloat(document.getElementById('eventLatitude').value);
-        const longitude = parseFloat(document.getElementById('eventLongitude').value);
-        const startTime = parseInt(document.getElementById('startTime').value);
-        const status = document.getElementById('status').value;
-        const difficulty = document.getElementById('difficulty').value;
-        const track = document.getElementById('track').value;
-
-        if (!title || isNaN(latitude) || isNaN(longitude) || isNaN(startTime)) {
-            alert('Please fill all fields correctly.');
-            return;
-        }
-
-        const newEvent = {
-            title,
-            latitude,
-            longitude,
-            startTime,
-            status,
-            difficulty,
-            track
-        };
-
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-            data: {
-                action: 'addEvent',
-                event: newEvent
-            }
-        }));
-
-        toggleAddEventForm();
-    }
-
     let tempMarker = null;
     let trackingCenter = false;
 
     function startLocationSelection() {
-        // Hide the form and show the confirm button
-        document.getElementById('addEventForm').style.display = 'none';
+        // show the confirm button
         document.getElementById('confirmLocationBtn').style.display = 'inline';
 
         trackingCenter = true;
@@ -363,43 +326,12 @@
             <button onclick="closeEventMenu()">Close</button>
         </div>
     </div>
-    <button id="addEventBtn" onclick="toggleAddEventForm()">+</button>
     <button id="confirmLocationBtn"
         onclick="confirmLocation()"
-        style="display:none; position: fixed; bottom: 90px; right: 20px; z-index: 1000;">
-        Confirm Location
+        style="display:none;">
+        ✅
     </button>
 
-<div id="addEventForm" style="display:none;">
-    <h3>Add New Event</h3>
-
-    <input type="text" id="eventTitle" placeholder="Event Title" /><br />
-    <input type="text" id="eventLatitude" placeholder="Latitude" readonly /><br />
-    <input type="text" id="eventLongitude" placeholder="Longitude" readonly /><br />
-
-    <input type="number" id="startTime" placeholder="Start Time (e.g. timestamp or minutes)" /><br />
-
-    <select id="status">
-        <option value="open">Open</option>
-        <option value="in progress">In Progress</option>
-        <option value="finished">Finished</option>
-    </select><br />
-
-    <select id="difficulty">
-        <option value="beginner">Beginner</option>
-        <option value="intermediate">Intermediate</option>
-        <option value="advanced">Advanced</option>
-    </select><br />
-
-    <select id="track">
-        <option value="free">Free Run</option>
-        <!-- More track options will go here in the future -->
-    </select><br />
-
-    <button type="button" onclick="startLocationSelection()">Choose Location on Map</button>
-    <button onclick="submitEvent()">Submit</button>
-    <button onclick="toggleAddEventForm()">Cancel</button>
-</div>
 <button id="userBtn" onclick="toggleUserMenu()">👤</button>
 <div id="userMenu" style="display:none;">
     <div id="userCard">
