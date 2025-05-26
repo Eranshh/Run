@@ -8,6 +8,7 @@ import * as SignalR from '@microsoft/signalr';
 export default function App() {
   const [userType, setUserType] = useState(null);
   const [connection, setConnection] = useState(null);
+  const [mapReady, setMapReady] = useState(false);
   
   const webViewRef = useRef(null);
 
@@ -90,7 +91,7 @@ export default function App() {
     return () => {
       if (watcher) watcher.remove();
     };
-  }, []);
+  }, [mapReady]);
 
 
   const createEvent = async () => {
@@ -233,7 +234,9 @@ export default function App() {
           createEvent(message.data.newEvent);
       } else if (message.data.action === "log"){
         //console.log("log message");
-        console.log(message.data.message);
+        console.log(message.data.action);
+      } else if (message.data.action === "mapReady") {
+        setMapReady(true);
       }
       
       else {
