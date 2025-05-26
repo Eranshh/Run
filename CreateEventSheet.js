@@ -4,7 +4,7 @@ import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { Picker } from '@react-native-picker/picker';
 
-const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, location }, ref) => {
+const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, location, tracks }, ref) => {
   const snapPoints = useMemo(() => ['25%', '75%'], []);
 
   const [latitude, setLatitude] = useState('');
@@ -116,10 +116,11 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
         <Picker
           selectedValue={track}
           onValueChange={(itemValue) => setTrack(itemValue)}
-          style={styles.picker}
         >
-          <Picker.Item label="Free Run" value="free run" />
-          {/* You can add more tracks in the future here */}
+          <Picker.Item label="Free Run" value="free" />
+          {tracks.map((id) => (
+            <Picker.Item key={id} label={id} value={id} />
+          ))}
         </Picker>
 
         <Button

@@ -6,6 +6,7 @@ import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
 import * as SignalR from '@microsoft/signalr';
 import CreateEventSheet from './CreateEventSheet';
+import { get } from 'react-native/Libraries/TurboModule/TurboModuleRegistry';
 
 export default function App() {
   const [userType, setUserType] = useState(null);
@@ -14,6 +15,7 @@ export default function App() {
   const [isSheetVisible, setIsSheetVisible] = useState(false);
   const [isSelectingLocation, setIsSelectingLocation] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
+  const [tracks, setTracks] = useState([]);
   
   const webViewRef = useRef(null);
 
@@ -113,6 +115,8 @@ export default function App() {
     };
 
     startWatchingLocation();
+    getAllTracks();
+    //getAllOpenEvents();
 
     return () => {
       if (watcher) watcher.remove();
@@ -241,6 +245,29 @@ export default function App() {
   }
 };
 
+const getAllTracks = async () => {
+    try {
+      const userId = "user123"; // Replace with the actual user ID
+      const response = await fetch(`https://runfuncionapp.azurewebsites.net/api/getAllTracks`);
+      const data = await response.json();
+      console.log('Got Tracks:', data);
+      const trackIds = data.map(track => track.trackId);
+      setTracks(trackIds); // Now just a list of strings
+      //setTracks(data); // Store them in state
+      // eventList.events = data;
+      // eventList.events = data.map((event) => ({
+      //   latitude: event.latitude,
+      //   longitude: event.longitude,
+      //   id: event.eventId,
+      // }));
+      // webViewRef.current.postMessage(JSON.stringify(eventList));
+      
+    } catch (error) {
+      console.error('Error calling Azure Function:', error);
+      console.log('Error occurred');
+    }
+  };
+
   const handleSelectLocation = () => {
     console.log("Entering location select mode");
     setIsSelectingLocation(true);
@@ -340,6 +367,7 @@ export default function App() {
               onSubmit={handleSubmitEvent}
               onSelectLocation={handleSelectLocation}
               location={selectedLocation}
+              tracks={tracks}
               onClose={() => setIsSheetVisible(false)}
             />
           )}
