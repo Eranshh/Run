@@ -139,7 +139,8 @@
                 //window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Map ready'}}));
                 //console.log('Map ready');
 
-                 // Wait a short moment to ensure the camera is settled
+                // Wait a short moment to ensure the camera is settled
+                window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'mapReady'}}));
                 window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'getEvents'}}));
                 window.document.addEventListener('message', function(event) {
                     try {

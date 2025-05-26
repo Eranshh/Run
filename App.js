@@ -16,6 +16,9 @@ export default function App() {
   const [isSelectingLocation, setIsSelectingLocation] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [tracks, setTracks] = useState([]);
+
+  const [mapReady, setMapReady] = useState(false);
+
   
   const webViewRef = useRef(null);
 
@@ -121,7 +124,7 @@ export default function App() {
     return () => {
       if (watcher) watcher.remove();
     };
-  }, []);
+  }, [mapReady]);
 
 
   const createEvent = async (event) => {
@@ -316,7 +319,9 @@ const getAllTracks = async () => {
         sheetRef.current?.snapToIndex(1);
       } else if (message.data.action === "log"){
         //console.log("log message");
-        console.log(message.data.message);
+        console.log(message.data.action);
+      } else if (message.data.action === "mapReady") {
+        setMapReady(true);
       }
       
       else {
