@@ -1,13 +1,19 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, Button } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
 import * as SignalR from '@microsoft/signalr';
+import CreateEventSheet from './CreateEventSheet';
 
 export default function App() {
   const [userType, setUserType] = useState(null);
   const [connection, setConnection] = useState(null);
+  const sheetRef = useRef(null);
+  const [isSheetVisible, setIsSheetVisible] = useState(false);
+  const [isSelectingLocation, setIsSelectingLocation] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState(null);
   
   const webViewRef = useRef(null);
 
@@ -97,6 +103,11 @@ export default function App() {
           webViewRef.current?.postMessage(
             JSON.stringify({ type: 'userLocation', location })
           );
+            // update location in create event form
+            if( !isSheetVisible) {
+              //setLatitude(location.latitude.toString());
+              //setLongitude(location.longitude.toString());
+            }
         }
       );
     };
@@ -111,6 +122,7 @@ export default function App() {
 
   const createEvent = async (event) => {
     try {
+      console.log("Creating event with data:", event);
       const response = await fetch('https://runfuncionapp.azurewebsites.net/api/createEvent',{
       method: 'POST',
       headers: {
@@ -229,6 +241,22 @@ export default function App() {
   }
 };
 
+  const handleSelectLocation = () => {
+    console.log("Entering location select mode");
+    setIsSelectingLocation(true);
+    webViewRef.current.postMessage(JSON.stringify({ type: 'startSelectingLocation' }));
+  };
+
+  const openEventSheet = () => {
+    sheetRef.current?.snapToIndex(1);
+    setIsSheetVisible(true); // show sheet
+  };
+  const handleSubmitEvent = (event) => {
+    createEvent(event);
+    sheetRef.current?.snapToIndex(-1);
+    setIsSheetVisible(false); // hide sheet
+  };
+
   // Listen for messages from the map:
   const handleWebViewMessage = (event) => {
     try {
@@ -253,6 +281,12 @@ export default function App() {
           console.log("creating event");
           console.log(message.data.event);
           createEvent(message.data.event);
+      }else if (message.data.action === "confirmLocation") {
+        console.log("Location confirmed:", message.data.location);
+        setSelectedLocation(message.data.location);
+        setIsSelectingLocation(false);
+        // Reopen sheet
+        sheetRef.current?.snapToIndex(1);
       } else if (message.data.action === "log"){
         //console.log("log message");
         console.log(message.data.message);
@@ -269,33 +303,44 @@ export default function App() {
 
   if (userType === null) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.text}>Choose user type:</Text>
-        <StatusBar style="auto" />
+       <GestureHandlerRootView style={{ flex: 1 }}>
+        <View style={styles.container}>
+          <Text style={styles.text}>Choose user type:</Text>
+          <StatusBar style="auto" />
 
-        <View style={styles.buttonContainer}>
-          <Button title="Runner" onPress={() => setUserType('runner')}/>
-          <Text>       </Text>
-          <Button title="Trainer" onPress={() => setUserType('trainer')}/>
+          <View style={styles.buttonContainer}>
+            <Button title="Runner" onPress={() => setUserType('runner')}/>
+            <Text>       </Text>
+            <Button title="Trainer" onPress={() => setUserType('trainer')}/>
+          </View>
         </View>
-      </View>
+      </GestureHandlerRootView>
     );
   } 
     return (
-      <View style={{flex: 1}}>
-        <WebView
-        ref={webViewRef}
-        originWhitelist={['*']}
-        source={require('./runnerMap.html')}
-        javaScriptEnabled={true}
-        domStorageEnabled={true}
-        style={{ flex: 1 }}
-        onMessage={handleWebViewMessage}
-        />
-        <Button title="Show All Events" onPress={getAllOpenEvents}/>
-        <Button title="Show My Events" onPress={getUsersEvents}/>
-        <Button title="Add Event" onPress={createEvent}/>
-      </View>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <View style={{flex: 1}}>
+          <WebView
+          ref={webViewRef}
+          originWhitelist={['*']}
+          source={require('./runnerMap.html')}
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+          style={{ flex: 1 }}
+          onMessage={handleWebViewMessage}
+          />
+          <Button title="Add Event" onPress={openEventSheet} />
+          {isSheetVisible && (
+            <CreateEventSheet
+              ref={sheetRef}
+              onSubmit={handleSubmitEvent}
+              onSelectLocation={handleSelectLocation}
+              location={selectedLocation}
+              onClose={() => setIsSheetVisible(false)}
+            />
+          )}
+        </View>
+      </GestureHandlerRootView>
     )
 }
 

@@ -205,6 +205,15 @@
                                     position: [location.coords.longitude, location.coords.latitude]
                                 });
                             }
+                        }else if (type === "startSelectingLocation"){
+                            // Start location selection
+                            startLocationSelection();
+                        } else if (type === 'log') {
+                            console.log('Log from WebView:', data.message);
+                        }else if (type === 'log') {
+                            console.log('Log from WebView:', data.message);
+                        } else {
+                            console.warn('Unknown message type:', type);
                         }
                     } catch (err) {
                         console.error('Invalid message recieved: ', err);
@@ -242,8 +251,12 @@
         const title = document.getElementById('eventTitle').value;
         const latitude = parseFloat(document.getElementById('eventLatitude').value);
         const longitude = parseFloat(document.getElementById('eventLongitude').value);
+        const startTime = parseInt(document.getElementById('startTime').value);
+        const status = document.getElementById('status').value;
+        const difficulty = document.getElementById('difficulty').value;
+        const track = document.getElementById('track').value;
 
-        if (!title || isNaN(latitude) || isNaN(longitude)) {
+        if (!title || isNaN(latitude) || isNaN(longitude) || isNaN(startTime)) {
             alert('Please fill all fields correctly.');
             return;
         }
@@ -251,10 +264,13 @@
         const newEvent = {
             title,
             latitude,
-            longitude
+            longitude,
+            startTime,
+            status,
+            difficulty,
+            track
         };
 
-        // Send to React Native or your backend as needed
         window.ReactNativeWebView.postMessage(JSON.stringify({
             data: {
                 action: 'addEvent',
@@ -308,12 +324,19 @@
         map.events.remove('move', updateMarkerPosition);
 
         const pos = tempMarker.getOptions().position;
-        document.getElementById('eventLatitude').value = pos[1].toFixed(6);
-        document.getElementById('eventLongitude').value = pos[0].toFixed(6);
 
-        // Hide confirm button and show form again
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+            data: {
+                action: 'confirmLocation',
+                location: {
+                    latitude: pos[1],
+                    longitude: pos[0]
+                }
+            }
+        }));
+
+        // Hide confirm button
         document.getElementById('confirmLocationBtn').style.display = 'none';
-        document.getElementById('addEventForm').style.display = 'block';
     }
     function closeEventMenu() {
         document.getElementById('eventMenu').style.display = 'none';
@@ -349,9 +372,30 @@
 
 <div id="addEventForm" style="display:none;">
     <h3>Add New Event</h3>
+
     <input type="text" id="eventTitle" placeholder="Event Title" /><br />
     <input type="text" id="eventLatitude" placeholder="Latitude" readonly /><br />
     <input type="text" id="eventLongitude" placeholder="Longitude" readonly /><br />
+
+    <input type="number" id="startTime" placeholder="Start Time (e.g. timestamp or minutes)" /><br />
+
+    <select id="status">
+        <option value="open">Open</option>
+        <option value="in progress">In Progress</option>
+        <option value="finished">Finished</option>
+    </select><br />
+
+    <select id="difficulty">
+        <option value="beginner">Beginner</option>
+        <option value="intermediate">Intermediate</option>
+        <option value="advanced">Advanced</option>
+    </select><br />
+
+    <select id="track">
+        <option value="free">Free Run</option>
+        <!-- More track options will go here in the future -->
+    </select><br />
+
     <button type="button" onclick="startLocationSelection()">Choose Location on Map</button>
     <button onclick="submitEvent()">Submit</button>
     <button onclick="toggleAddEventForm()">Cancel</button>
