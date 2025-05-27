@@ -377,7 +377,7 @@ const getAllTracks = async () => {
               onSubmit={handleSubmitEvent}
               onSelectLocation={handleSelectLocation}
               location={selectedLocation}
-              tracks={tracks}
+              webRef={webViewRef}
               onClose={() => setIsSheetVisible(false)}
             />
           )}

@@ -4,7 +4,7 @@ import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { Picker } from '@react-native-picker/picker';
 
-const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, location, tracks }, ref) => {
+const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, location, webRef }, ref) => {
   const snapPoints = useMemo(() => ['25%', '75%'], []);
 
   const [latitude, setLatitude] = useState('');
@@ -23,6 +23,14 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
     }
   }, [location]);
 
+
+  const handleSelectTrackFromMap = () => {
+    // Close sheet and initiate selection
+    ref.current?.close(); // Close the sheet
+    webRef.current?.postMessage(JSON.stringify({
+      data: { action: 'startTrackSelection' }
+    }));
+  };
   const handleSubmit = () => {
     if (!latitude || !longitude || !startTime) {
       alert('Please fill in all fields');
@@ -80,16 +88,16 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
         />
 
         <TextInput
-          placeholder="Latitude"
-          value={latitude}
-          onChangeText={setLatitude}
+          placeholder="Longitude"
+          value={longitude}
+          onChangeText={setLongitude}
           keyboardType="numeric"
           style={styles.input}
         />
         <TextInput
-          placeholder="Longitude"
-          value={longitude}
-          onChangeText={setLongitude}
+          placeholder="Latitude"
+          value={latitude}
+          onChangeText={setLatitude}
           keyboardType="numeric"
           style={styles.input}
         />
@@ -129,9 +137,6 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
           onValueChange={(itemValue) => setTrack(itemValue)}
         >
           <Picker.Item label="Free Run" value={null} />
-          {tracks.map((id) => (
-            <Picker.Item key={id} label={id} value={id} />
-          ))}
         </Picker>
 
         <Button
@@ -140,6 +145,11 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
             ref.current?.close(); // Close the sheet
             onSelectLocation();   // Notify parent to enter map-pinning mode
           }}
+        />
+        <Button
+          title="Select Track From Map"
+          onPress={handleSelectTrackFromMap}
+          color="#0078D4" // Optional styling
         />
         <Button title="Submit" onPress={handleSubmit} />
         <Button title="Close" onPress={() => ref.current?.close()} />

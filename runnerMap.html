@@ -224,7 +224,18 @@
                             const tracks  = data.tracks || [];
                             window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Received track list'}}));
                             window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: data.tracks}}));
-                            drawPath(tracks[1].path);
+                            for (let i = 0; i < tracks.length; i++) {
+                                const { path, id } = tracks[i];
+                                if (!path || !Array.isArray(path) || path.length === 0) {
+                                    console.warn(`⚠️ Skipping track ${id} due to invalid path`);
+                                    continue;
+                                }
+                                // Draw the path on the map
+                                drawPath(tracks[i]);
+                            }
+                        }else if (type === 'trackSelected') {
+                            const selectedTrackId = data.trackId;
+                            setFormValues(prev => ({ ...prev, track: selectedTrackId }));
                         }else if (type === 'log') {
                             console.log('Log from WebView:', data.message);
                         }else {
@@ -329,33 +340,102 @@
     function closeUserMenu() {
         document.getElementById('userMenu').style.display = 'none';
     }
+    let trackMarkers = [];
+    let selectedTrackId = null;
 
-    function drawPath(path) {
-        window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: path}}));
+    function enableTrackSelection() {
+        // Assume window.trackMarkers is a list of track marker objects
+        window.trackMarkers.forEach(marker => {
+
+            marker.setOptions({ visible: true }); // Show the marker
+            map.events.add('click', marker, () => {
+                selectedTrackId = marker.trackId; // or marker.metadata.id
+                highlightSelectedTrack(marker); // Optional: change color/style
+                showSelectTrackButton();
+            });
+        });
+    }
+
+    function showSelectTrackButton() {
+        if (!document.getElementById('selectTrackBtn')) {
+            const btn = document.createElement('button');
+            btn.id = 'selectTrackBtn';
+            btn.innerText = '✅ Select This Track';
+            btn.style.position = 'fixed';
+            btn.style.bottom = '90px';
+            btn.style.left = '50%';
+            btn.style.transform = 'translateX(-50%)';
+            btn.style.zIndex = 1000;
+            btn.style.padding = '10px 20px';
+            btn.style.backgroundColor = '#0078D4';
+            btn.style.color = 'white';
+            btn.style.border = 'none';
+            btn.style.borderRadius = '8px';
+            btn.onclick = confirmSelectedTrack;
+
+            document.body.appendChild(btn);
+        }
+    }
+
+    function confirmSelectedTrack() {
+        if (selectedTrackId) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+                data: {
+                    action: 'trackSelected',
+                    trackId: selectedTrackId
+                }
+            }));
+
+            // Clean up
+            const btn = document.getElementById('selectTrackBtn');
+            if (btn) btn.remove();
+            trackMarkers.forEach(marker => {
+                marker.setOptions({ visible: false }); // Hide the markers
+            });
+        }
+    }
+    function drawPath(track) {
+        let path = track.path || [];
+        //window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: path}}));
         try{
 
             const marker = new atlas.HtmlMarker({
                 position: path[0],
                 text: 'T',
-                color: 'orange'
+                color: 'orange',
+                visible: false
             });
-
+            marker.trackId = track.trackId; // <-- store the track ID here
+            trackMarkers.push(marker);
+            
             map.markers.add(marker);
             // Create a LineString geometry
             const line = new atlas.data.LineString(path);
             const feature = new atlas.data.Feature(line);
-
+            
             // Create a DataSource and add the line feature to it
             const dataSource = new atlas.source.DataSource();
             map.sources.add(dataSource);
             dataSource.add(feature);
-
+            
             // Create a line layer and add it to the map
             const lineLayer = new atlas.layer.LineLayer(dataSource, null, {
                 strokeColor: 'red',
-                strokeWidth: 3
+                strokeWidth: 3,
+                visible: false, // Initially hidden
             });
             map.layers.add(lineLayer);
+            map.events.add('click', marker, () => {
+                // Toggle visibility of the line layer
+                const isVisible = lineLayer.getOptions().visible;
+                lineLayer.setOptions({ visible: !isVisible });
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                    data: {
+                        action: 'log',
+                        message: `Toggled path visibility: ${!isVisible}`
+                    }
+                }));
+            });
         }   catch (err) {
             console.error("Failed to draw path:", err);
             window.ReactNativeWebView.postMessage(JSON.stringify({
