@@ -17,6 +17,7 @@ export default function App() {
   const [isSelectingLocation, setIsSelectingLocation] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [tracks, setTracks] = useState([]);
+  const [selectedTrack, setSelectedTrack] = useState(null);
 
   const [mapReady, setMapReady] = useState(false);
 
@@ -319,6 +320,12 @@ const getAllTracks = async () => {
         setIsSelectingLocation(false);
         // Reopen sheet
         sheetRef.current?.snapToIndex(1);
+      } else if (message.data.action === 'trackSelected') {
+        console.log('Track selected:', message.data.trackId);
+        const selectedTrackId = message.data.trackId;
+        setSelectedTrack(selectedTrackId);
+        openEventSheet();
+
       } else if (message.data.action === "log"){
         //console.log("log message");
         console.log(message.data.message);
@@ -378,6 +385,8 @@ const getAllTracks = async () => {
               onSelectLocation={handleSelectLocation}
               location={selectedLocation}
               webRef={webViewRef}
+              selectedTrack={selectedTrack}
+              tracks={tracks}
               onClose={() => setIsSheetVisible(false)}
             />
           )}

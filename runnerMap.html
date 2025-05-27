@@ -233,9 +233,11 @@
                                 // Draw the path on the map
                                 drawPath(tracks[i]);
                             }
-                        }else if (type === 'trackSelected') {
-                            const selectedTrackId = data.trackId;
-                            setFormValues(prev => ({ ...prev, track: selectedTrackId }));
+                        }else if (type === 'startTrackSelection') {
+                            console.log('Starting track selection');
+                            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Starting track selection'}}));
+                            enableTrackSelection();
+
                         }else if (type === 'log') {
                             console.log('Log from WebView:', data.message);
                         }else {
@@ -345,14 +347,14 @@
 
     function enableTrackSelection() {
         // Assume window.trackMarkers is a list of track marker objects
-        window.trackMarkers.forEach(marker => {
+        trackMarkers.forEach(marker => {
 
             marker.setOptions({ visible: true }); // Show the marker
-            map.events.add('click', marker, () => {
-                selectedTrackId = marker.trackId; // or marker.metadata.id
-                highlightSelectedTrack(marker); // Optional: change color/style
-                showSelectTrackButton();
-            });
+            // map.events.add('click', marker, () => {
+            //     selectedTrackId = marker.trackId; // or marker.metadata.id
+            //     highlightSelectedTrack(marker); // Optional: change color/style
+            //     showSelectTrackButton();
+            // });
         });
     }
 
@@ -429,6 +431,8 @@
                 // Toggle visibility of the line layer
                 const isVisible = lineLayer.getOptions().visible;
                 lineLayer.setOptions({ visible: !isVisible });
+                selectedTrackId = marker.trackId; // or marker.metadata.id
+                showSelectTrackButton();
                 window.ReactNativeWebView.postMessage(JSON.stringify({
                     data: {
                         action: 'log',

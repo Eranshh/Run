@@ -4,9 +4,10 @@ import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { Picker } from '@react-native-picker/picker';
 
-const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, location, webRef }, ref) => {
+const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, location, webRef, selectedTrack, tracks }, ref) => {
   const snapPoints = useMemo(() => ['25%', '75%'], []);
-
+  
+  const [formValues, setFormValues] = useState({ track: null });
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
   const [startTime, setStartTime] = useState('');
@@ -23,13 +24,20 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
     }
   }, [location]);
 
+  useEffect(() => {
+    if (selectedTrack !== null) {
+      //setFormValues((prev) => ({ ...prev, track: selectedTrack }));
+      setTrack(selectedTrack);
+      
+    }
+  }, [selectedTrack]);
 
   const handleSelectTrackFromMap = () => {
     // Close sheet and initiate selection
     ref.current?.close(); // Close the sheet
-    webRef.current?.postMessage(JSON.stringify({
-      data: { action: 'startTrackSelection' }
-    }));
+    webRef.current?.postMessage(JSON.stringify(
+      { type: 'startTrackSelection' }
+    ));
   };
   const handleSubmit = () => {
     if (!latitude || !longitude || !startTime) {
@@ -137,6 +145,9 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
           onValueChange={(itemValue) => setTrack(itemValue)}
         >
           <Picker.Item label="Free Run" value={null} />
+          {tracks.map((id, index) => (
+          <Picker.Item key={id} label={`Track ${index + 1}`} value={id} />
+          ))}
         </Picker>
 
         <Button
