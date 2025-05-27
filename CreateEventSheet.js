@@ -10,6 +10,7 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
   const [startTime, setStartTime] = useState('');
+  const [name, setName] = useState('');
   const [status, setStatus] = useState('open');
   const [difficulty, setDifficulty] = useState('beginner');
   const [track, setTrack] = useState('free run');
@@ -35,10 +36,12 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
       status,
       difficulty,
       track,
+      name
     };
 
     onSubmit?.(event);
      // Reset fields
+    setName('');
     setLatitude('');
     setLongitude('');
     setStartTime('');
@@ -67,6 +70,14 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
       >
       <BottomSheetView style={styles.container}>
         <Text style={styles.title}>Create Event</Text>
+
+        <TextInput
+          placeholder="Name"
+          value={name}
+          onChangeText={setName}
+          keyboardType="text"
+          style={styles.input}
+        />
 
         <TextInput
           placeholder="Latitude"
@@ -117,7 +128,7 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
           selectedValue={track}
           onValueChange={(itemValue) => setTrack(itemValue)}
         >
-          <Picker.Item label="Free Run" value="free" />
+          <Picker.Item label="Free Run" value={null} />
           {tracks.map((id) => (
             <Picker.Item key={id} label={id} value={id} />
           ))}
