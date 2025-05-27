@@ -144,12 +144,15 @@
                 window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'getEvents'}}));
                 window.document.addEventListener('message', function(event) {
                     try {
+                        window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: event.data}}));
                         const data = JSON.parse(event.data);
-                        const { type } = data;
-                        
+                        const type  = data.type || {};
+                        window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: type}}));
                         if (type === 'eventList') {
-
-                            const { events } = data;
+                            // Handle event list
+                            console.log('Received event list:', data.data);
+                            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Received event list'}}));
+                            const events  = data.events || [];
 
                             // Clear existing markers
                             if (!window.eventMarkers) {
@@ -164,7 +167,10 @@
 
                             for (let i = 0; i < events.length; i++) {
                                 const { latitude, longitude, id, title, userId } = events[i];
-
+                                if (isNaN(latitude) || isNaN(longitude)) {
+                                    console.warn(`⚠️ Skipping event ${id} due to invalid coordinates`);
+                                    continue;
+                                }
                                 const marker = new atlas.HtmlMarker({
                                     position: [longitude, latitude],
                                     text: '!'
@@ -215,13 +221,17 @@
                             startLocationSelection();
                         } else if (type === 'log') {
                             console.log('Log from WebView:', data.message);
-                        }else if (type === 'log') {
-                            console.log('Log from WebView:', data.message);
-                        } else {
+                        }else {
                             console.warn('Unknown message type:', type);
                         }
                     } catch (err) {
-                        console.error('Invalid message recieved: ', err);
+                        console.error("Failed to parse message:", event.data, "\nError:", err);
+                        window.ReactNativeWebView.postMessage(JSON.stringify({
+                            data: {
+                                action: 'log',
+                                message: 'Error parsing message: ' + err.message
+                            }
+                        }));
                     }
                 })
             })

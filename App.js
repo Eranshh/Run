@@ -7,6 +7,7 @@ import * as Location from 'expo-location';
 import * as SignalR from '@microsoft/signalr';
 import CreateEventSheet from './CreateEventSheet';
 import { get } from 'react-native/Libraries/TurboModule/TurboModuleRegistry';
+import { ConsoleLogger } from '@microsoft/signalr/dist/esm/Utils';
 
 export default function App() {
   const [userType, setUserType] = useState(null);
@@ -119,7 +120,6 @@ export default function App() {
 
     startWatchingLocation();
     getAllTracks();
-    //getAllOpenEvents();
 
     return () => {
       if (watcher) watcher.remove();
@@ -220,6 +220,7 @@ export default function App() {
       longitude: event.longitude,
       id: event.eventId,
     }));
+    console.log('Event list:', eventList);
     webViewRef.current.postMessage(JSON.stringify(eventList));
     
   } catch (error) {
@@ -319,9 +320,11 @@ const getAllTracks = async () => {
         sheetRef.current?.snapToIndex(1);
       } else if (message.data.action === "log"){
         //console.log("log message");
-        console.log(message.data.action);
+        console.log(message.data.message);
       } else if (message.data.action === "mapReady") {
+        console.log("Map is ready");
         setMapReady(true);
+        getAllOpenEvents();
       }
       
       else {
