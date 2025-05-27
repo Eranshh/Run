@@ -9,7 +9,7 @@
         html, body { margin: 0; padding: 0; height: 100%; width: 100%; }
         #myMap { width: 100%; height: 100vh; }
 
-        #addEventBtn {
+        .reactAddEventBtn  {
             position: fixed;
             bottom: 20px;
             right: 20px;
@@ -24,17 +24,101 @@
             z-index: 1000;
             box-shadow: 0 4px 8px rgba(0,0,0,0.3);
         }
-
-        #addEventForm {
+        #confirmLocationBtn {
             position: fixed;
             bottom: 90px;
             right: 20px;
-            background: white;
-            padding: 15px;
-            border: 1px solid #ccc;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            font-size: 28px;
+            background-color: #28A745;
+            color: white;
+            border: none;
+            cursor: pointer;
             z-index: 1000;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+
+        #eventMenu {
+            position: fixed;
+            bottom: 90px;
+            left: 20px;
+            z-index: 1000;
+            display: none;
+        }
+
+        #eventCard {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            padding: 15px 20px;
             width: 250px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+        }
+
+        #eventCard h3 {
+            margin: 0 0 10px;
+        }
+
+        #eventCard button {
+            margin-right: 10px;
+            margin-top: 10px;
+            padding: 5px 10px;
+            border: none;
+            border-radius: 6px;
+            background-color: #0078D4;
+            color: white;
+            cursor: pointer;
+        }
+
+        #eventCard button:last-child {
+            background-color: #ccc;
+            color: black;
+        }
+        #userBtn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            font-size: 24px;
+            background-color: white;
+            color: #333;
+            border: 1px solid #ccc;
+            cursor: pointer;
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        #userMenu {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        #userCard {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            padding: 15px 20px;
+            width: 250px;
+            transition: all 0.3s ease;
+        }
+
+        #userCard h3, #userCard h4 {
+            margin: 10px 0 5px;
+        }
+
+        #userCard ul {
+            padding-left: 20px;
+            margin: 0;
+        }
+
+        #userCard li {
+            margin-bottom: 5px;
+            font-size: 14px;
         }
     </style>
 
@@ -55,19 +139,22 @@
                 //window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Map ready'}}));
                 //console.log('Map ready');
 
-                 // Wait a short moment to ensure the camera is settled
+                // Wait a short moment to ensure the camera is settled
+                window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'mapReady'}}));
                 window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'getEvents'}}));
                 window.document.addEventListener('message', function(event) {
                     try {
+                        window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: event.data}}));
                         const data = JSON.parse(event.data);
-                        const { type } = data;
-
+                        const type  = data.type || {};
+                        window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: type}}));
                         if (type === 'eventList') {
+                            // Handle event list
+                            console.log('Received event list:', data.data);
+                            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Received event list'}}));
+                            const events  = data.events || [];
 
-                            const { events } = data;
-
-                            //const { latitude, longitude } = data;
-
+                            // Clear existing markers
                             if (!window.eventMarkers) {
                                 window.eventMarkers = [];
                             } else {
@@ -75,28 +162,44 @@
                                 window.eventMarkers = [];
                             }
 
-                            for (let i = 0; i < events.length; i++) {
-                                const { latitude, longitude, id, title } = events[i];
+                            // Store my events
+                            window.myEvents = [];
 
+                            for (let i = 0; i < events.length; i++) {
+                                const { latitude, longitude, id, title, userId } = events[i];
+                                if (isNaN(latitude) || isNaN(longitude)) {
+                                    console.warn(`⚠️ Skipping event ${id} due to invalid coordinates`);
+                                    continue;
+                                }
                                 const marker = new atlas.HtmlMarker({
                                     position: [longitude, latitude],
                                     text: '!'
                                 });
+
                                 map.markers.add(marker);
                                 window.eventMarkers.push(marker);
 
-                                // Capture event info for this marker
                                 map.events.add('click', marker, () => {
-                                    // Show event data in the menu
-                                    document.getElementById('eventDetails').textContent = `Event ID: ${id}, Title: ${title || 'Untitled'}`;
-
-                                    // Store the current event ID for the buttons to use
+                                    document.getElementById('eventTitleDisplay').textContent = title || 'Untitled';
+                                    document.getElementById('eventCoords').textContent = `Lat: ${latitude}, Lng: ${longitude}`;
                                     window.selectedEventId = id;
-
-                                    // Show the menu
                                     document.getElementById('eventMenu').style.display = 'block';
                                 });
+
+                                // For now, fake current user as 'me'
+                                if (userId === 'me') {
+                                    window.myEvents.push({ id, title });
+                                }
                             }
+
+                        // Update the "My Events" list
+                        const list = document.getElementById('myEventsList');
+                        list.innerHTML = '';
+                        window.myEvents.forEach(evt => {
+                            const li = document.createElement('li');
+                            li.textContent = evt.title || '(Untitled)';
+                            list.appendChild(li);
+                        });
 
                         } else if (type === 'userLocation') {
                             const { location } = data;
@@ -113,9 +216,41 @@
                                     position: [location.coords.longitude, location.coords.latitude]
                                 });
                             }
+                        }else if (type === "startSelectingLocation"){
+                            // Start location selection
+                            startLocationSelection();
+                        } else if (type === 'tracks') {
+                            console.log('Received track list:', data.data);
+                            const tracks  = data.tracks || [];
+                            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Received track list'}}));
+                            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: data.tracks}}));
+                            for (let i = 0; i < tracks.length; i++) {
+                                const { path, id } = tracks[i];
+                                if (!path || !Array.isArray(path) || path.length === 0) {
+                                    console.warn(`⚠️ Skipping track ${id} due to invalid path`);
+                                    continue;
+                                }
+                                // Draw the path on the map
+                                drawPath(tracks[i]);
+                            }
+                        }else if (type === 'startTrackSelection') {
+                            console.log('Starting track selection');
+                            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Starting track selection'}}));
+                            enableTrackSelection();
+
+                        }else if (type === 'log') {
+                            console.log('Log from WebView:', data.message);
+                        }else {
+                            console.warn('Unknown message type:', type);
                         }
                     } catch (err) {
-                        console.error('Invalid message recieved: ', err);
+                        console.error("Failed to parse message:", event.data, "\nError:", err);
+                        window.ReactNativeWebView.postMessage(JSON.stringify({
+                            data: {
+                                action: 'log',
+                                message: 'Error parsing message: ' + err.message
+                            }
+                        }));
                     }
                 })
             })
@@ -140,45 +275,11 @@
             window.ReactNativeWebView.postMessage(JSON.stringify(message));
             getElementById('eventMenu').style.display = 'none';
         }
-
-    function toggleAddEventForm() {
-        const form = document.getElementById('addEventForm');
-        form.style.display = form.style.display === 'none' ? 'block' : 'none';
-    }
-
-    function submitEvent() {
-        const title = document.getElementById('eventTitle').value;
-        const latitude = parseFloat(document.getElementById('eventLatitude').value);
-        const longitude = parseFloat(document.getElementById('eventLongitude').value);
-
-        if (!title || isNaN(latitude) || isNaN(longitude)) {
-            alert('Please fill all fields correctly.');
-            return;
-        }
-
-        const newEvent = {
-            title,
-            latitude,
-            longitude
-        };
-
-        // Send to React Native or your backend as needed
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-            data: {
-                action: 'addEvent',
-                event: newEvent
-            }
-        }));
-
-        toggleAddEventForm();
-    }
-
     let tempMarker = null;
     let trackingCenter = false;
 
     function startLocationSelection() {
-        // Hide the form and show the confirm button
-        document.getElementById('addEventForm').style.display = 'none';
+        // show the confirm button
         document.getElementById('confirmLocationBtn').style.display = 'inline';
 
         trackingCenter = true;
@@ -216,38 +317,170 @@
         map.events.remove('move', updateMarkerPosition);
 
         const pos = tempMarker.getOptions().position;
-        document.getElementById('eventLatitude').value = pos[1].toFixed(6);
-        document.getElementById('eventLongitude').value = pos[0].toFixed(6);
 
-        // Hide confirm button and show form again
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+            data: {
+                action: 'confirmLocation',
+                location: {
+                    latitude: pos[1],
+                    longitude: pos[0]
+                }
+            }
+        }));
+
+        // Hide confirm button
         document.getElementById('confirmLocationBtn').style.display = 'none';
-        document.getElementById('addEventForm').style.display = 'block';
+    }
+    function closeEventMenu() {
+        document.getElementById('eventMenu').style.display = 'none';
+    }
+    function toggleUserMenu() {
+        const menu = document.getElementById('userMenu');
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function closeUserMenu() {
+        document.getElementById('userMenu').style.display = 'none';
+    }
+    let trackMarkers = [];
+    let selectedTrackId = null;
+
+    function enableTrackSelection() {
+        // Assume window.trackMarkers is a list of track marker objects
+        trackMarkers.forEach(marker => {
+
+            marker.setOptions({ visible: true }); // Show the marker
+            // map.events.add('click', marker, () => {
+            //     selectedTrackId = marker.trackId; // or marker.metadata.id
+            //     highlightSelectedTrack(marker); // Optional: change color/style
+            //     showSelectTrackButton();
+            // });
+        });
+    }
+
+    function showSelectTrackButton() {
+        if (!document.getElementById('selectTrackBtn')) {
+            const btn = document.createElement('button');
+            btn.id = 'selectTrackBtn';
+            btn.innerText = '✅ Select This Track';
+            btn.style.position = 'fixed';
+            btn.style.bottom = '90px';
+            btn.style.left = '50%';
+            btn.style.transform = 'translateX(-50%)';
+            btn.style.zIndex = 1000;
+            btn.style.padding = '10px 20px';
+            btn.style.backgroundColor = '#0078D4';
+            btn.style.color = 'white';
+            btn.style.border = 'none';
+            btn.style.borderRadius = '8px';
+            btn.onclick = confirmSelectedTrack;
+
+            document.body.appendChild(btn);
+        }
+    }
+
+    function confirmSelectedTrack() {
+        if (selectedTrackId) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+                data: {
+                    action: 'trackSelected',
+                    trackId: selectedTrackId
+                }
+            }));
+
+            // Clean up
+            const btn = document.getElementById('selectTrackBtn');
+            if (btn) btn.remove();
+            trackMarkers.forEach(marker => {
+                marker.setOptions({ visible: false }); // Hide the markers
+            });
+        }
+    }
+    function drawPath(track) {
+        let path = track.path || [];
+        //window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: path}}));
+        try{
+
+            const marker = new atlas.HtmlMarker({
+                position: path[0],
+                text: 'T',
+                color: 'orange',
+                visible: false
+            });
+            marker.trackId = track.trackId; // <-- store the track ID here
+            trackMarkers.push(marker);
+            
+            map.markers.add(marker);
+            // Create a LineString geometry
+            const line = new atlas.data.LineString(path);
+            const feature = new atlas.data.Feature(line);
+            
+            // Create a DataSource and add the line feature to it
+            const dataSource = new atlas.source.DataSource();
+            map.sources.add(dataSource);
+            dataSource.add(feature);
+            
+            // Create a line layer and add it to the map
+            const lineLayer = new atlas.layer.LineLayer(dataSource, null, {
+                strokeColor: 'red',
+                strokeWidth: 3,
+                visible: false, // Initially hidden
+            });
+            map.layers.add(lineLayer);
+            map.events.add('click', marker, () => {
+                // Toggle visibility of the line layer
+                const isVisible = lineLayer.getOptions().visible;
+                lineLayer.setOptions({ visible: !isVisible });
+                selectedTrackId = marker.trackId; // or marker.metadata.id
+                showSelectTrackButton();
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                    data: {
+                        action: 'log',
+                        message: `Toggled path visibility: ${!isVisible}`
+                    }
+                }));
+            });
+        }   catch (err) {
+            console.error("Failed to draw path:", err);
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+                data: {
+                    action: 'log',
+                    message: 'Error drawing path: ' + err.message
+                }
+            }));
+        }
     }
     </script>
 </head>
 <body onload="getMap()">
     <div id="myMap"></div>
 
-    <div id="eventMenu" style="display:none; padding:15px; background:#f8f8f8; border-top:1px solid #ccc;">
-    <p id="eventDetails"></p>
-    <button onclick="handleJoin()">Join</button>
-    <button onclick="handleDelete()">Delete</button>
+    <div id="eventMenu" style="display: none;">
+        <div id="eventCard">
+            <h3 id="eventTitleDisplay">Event Title</h3>
+            <p id="eventCoords"></p>
+            <button onclick="handleJoin()">Join</button>
+            <button onclick="handleDelete()">Delete</button>
+            <button onclick="closeEventMenu()">Close</button>
+        </div>
     </div>
-    <button id="addEventBtn" onclick="toggleAddEventForm()">+</button>
     <button id="confirmLocationBtn"
         onclick="confirmLocation()"
-        style="display:none; position: fixed; bottom: 90px; right: 20px; z-index: 1000;">
-        Confirm Location
+        style="display:none;">
+        ✅
     </button>
 
-<div id="addEventForm" style="display:none;">
-    <h3>Add New Event</h3>
-    <input type="text" id="eventTitle" placeholder="Event Title" /><br />
-    <input type="text" id="eventLatitude" placeholder="Latitude" readonly /><br />
-    <input type="text" id="eventLongitude" placeholder="Longitude" readonly /><br />
-    <button type="button" onclick="startLocationSelection()">Choose Location on Map</button>
-    <button onclick="submitEvent()">Submit</button>
-    <button onclick="toggleAddEventForm()">Cancel</button>
+<button id="userBtn" onclick="toggleUserMenu()">👤</button>
+<div id="userMenu" style="display:none;">
+    <div id="userCard">
+        <h3>User Info</h3>
+        <p>(Not signed in)</p>
+
+        <h4>My Events</h4>
+        <ul id="myEventsList"></ul>
+
+        <button onclick="closeUserMenu()">Close</button>
+    </div>
 </div>
 </body>
 </html>
