@@ -119,7 +119,6 @@ export default function App() {
     };
 
     startWatchingLocation();
-    getAllTracks();
 
     return () => {
       if (watcher) watcher.remove();
@@ -255,8 +254,10 @@ const getAllTracks = async () => {
       const response = await fetch(`https://runfuncionapp.azurewebsites.net/api/getAllTracks`);
       const data = await response.json();
       console.log('Got Tracks:', data);
+      console.log('first point:', data[0].path[0]);
       const trackIds = data.map(track => track.trackId);
       setTracks(trackIds); // Now just a list of strings
+      webViewRef.current.postMessage(JSON.stringify({'type': "tracks", 'tracks': data}));
       //setTracks(data); // Store them in state
       // eventList.events = data;
       // eventList.events = data.map((event) => ({
@@ -325,6 +326,7 @@ const getAllTracks = async () => {
         console.log("Map is ready");
         setMapReady(true);
         getAllOpenEvents();
+        getAllTracks();
       }
       
       else {

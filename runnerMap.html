@@ -219,7 +219,13 @@
                         }else if (type === "startSelectingLocation"){
                             // Start location selection
                             startLocationSelection();
-                        } else if (type === 'log') {
+                        } else if (type === 'tracks') {
+                            console.log('Received track list:', data.data);
+                            const tracks  = data.tracks || [];
+                            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Received track list'}}));
+                            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: data.tracks}}));
+                            drawPath(tracks[1].path);
+                        }else if (type === 'log') {
                             console.log('Log from WebView:', data.message);
                         }else {
                             console.warn('Unknown message type:', type);
@@ -322,6 +328,43 @@
 
     function closeUserMenu() {
         document.getElementById('userMenu').style.display = 'none';
+    }
+
+    function drawPath(path) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: path}}));
+        try{
+
+            const marker = new atlas.HtmlMarker({
+                position: path[0],
+                text: 'T',
+                color: 'orange'
+            });
+
+            map.markers.add(marker);
+            // Create a LineString geometry
+            const line = new atlas.data.LineString(path);
+            const feature = new atlas.data.Feature(line);
+
+            // Create a DataSource and add the line feature to it
+            const dataSource = new atlas.source.DataSource();
+            map.sources.add(dataSource);
+            dataSource.add(feature);
+
+            // Create a line layer and add it to the map
+            const lineLayer = new atlas.layer.LineLayer(dataSource, null, {
+                strokeColor: 'red',
+                strokeWidth: 3
+            });
+            map.layers.add(lineLayer);
+        }   catch (err) {
+            console.error("Failed to draw path:", err);
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+                data: {
+                    action: 'log',
+                    message: 'Error drawing path: ' + err.message
+                }
+            }));
+        }
     }
     </script>
 </head>
