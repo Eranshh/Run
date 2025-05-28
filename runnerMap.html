@@ -343,6 +343,7 @@
         document.getElementById('userMenu').style.display = 'none';
     }
     let trackMarkers = [];
+    let trackLineLayers = [];
     let selectedTrackId = null;
 
     function enableTrackSelection() {
@@ -394,8 +395,12 @@
             trackMarkers.forEach(marker => {
                 marker.setOptions({ visible: false }); // Hide the markers
             });
+            trackLineLayers.forEach(layer => {
+                layer.setOptions({ visible: false }); // Hide the tracks
+            })
         }
     }
+
     function drawPath(track) {
         let path = track.path || [];
         //window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: path}}));
@@ -426,6 +431,7 @@
                 strokeWidth: 3,
                 visible: false, // Initially hidden
             });
+            trackLineLayers.push(lineLayer);
             map.layers.add(lineLayer);
             map.events.add('click', marker, () => {
                 // Toggle visibility of the line layer
