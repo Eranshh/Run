@@ -345,6 +345,8 @@
     let trackMarkers = [];
     let trackLineLayers = [];
     let selectedTrackId = null;
+    let selectedTrackLon = null;
+    let selectedTrackLat = null;
 
     function enableTrackSelection() {
         // Assume window.trackMarkers is a list of track marker objects
@@ -385,7 +387,11 @@
             window.ReactNativeWebView.postMessage(JSON.stringify({
                 data: {
                     action: 'trackSelected',
-                    trackId: selectedTrackId
+                    trackId: selectedTrackId,
+                    location: {
+                        longitude: selectedTrackLon,
+                        latitude: selectedTrackLat
+                    }
                 }
             }));
 
@@ -438,6 +444,8 @@
                 const isVisible = lineLayer.getOptions().visible;
                 lineLayer.setOptions({ visible: !isVisible });
                 selectedTrackId = marker.trackId; // or marker.metadata.id
+                selectedTrackLon = marker.getOptions().position[0];
+                selectedTrackLat = marker.getOptions().position[1];
                 showSelectTrackButton();
                 window.ReactNativeWebView.postMessage(JSON.stringify({
                     data: {

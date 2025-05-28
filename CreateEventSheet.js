@@ -27,8 +27,7 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
   useEffect(() => {
     if (selectedTrack !== null) {
       //setFormValues((prev) => ({ ...prev, track: selectedTrack }));
-      setTrack(selectedTrack);
-      
+      setTrack(selectedTrack.trackId);
     }
   }, [selectedTrack]);
 
