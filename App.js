@@ -326,6 +326,10 @@ const getAllTracks = async () => {
         setSelectedTrack(selectedTrackId);
         setSelectedLocation(message.data.location);
         openEventSheet();
+      } else if (message.data.action === 'cancelTrackSelection') {
+        console.log('Canceling track selection');
+        sheetRef.current?.snapToIndex(0);
+        setIsSheetVisible(false); // hide sheet
 
       } else if (message.data.action === "log"){
         //console.log("log message");

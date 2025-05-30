@@ -382,6 +382,27 @@
         }
     }
 
+    function showCancelTrackSelectionButton() {
+        if (!document.getElementById('cancelTrackSelectionBtn')) {
+            const btn = document.createElement('button');
+            btn.id = 'cancelTrackSelectionBtn';
+            btn.innerText = 'Cancel';
+            btn.style.position = 'fixed';
+            btn.style.bottom = '45px';
+            btn.style.left = '50%';
+            btn.style.transform = 'translateX(-50%)';
+            btn.style.zIndex = 1000;
+            btn.style.padding = '10px 20px';
+            btn.style.backgroundColor = '#0078D4';
+            btn.style.color = 'white';
+            btn.style.border = 'none';
+            btn.style.borderRadius = '8px';
+            btn.onclick = cancelTrackSelection;
+
+            document.body.appendChild(btn);
+        }
+    }
+
     function confirmSelectedTrack() {
         if (selectedTrackId) {
             window.ReactNativeWebView.postMessage(JSON.stringify({
@@ -396,8 +417,10 @@
             }));
 
             // Clean up
-            const btn = document.getElementById('selectTrackBtn');
-            if (btn) btn.remove();
+            const cancelBtn = document.getElementById('cancelTrackSelectionBtn');
+            const selectBtn = document.getElementById('selectTrackBtn');
+            if (cancelBtn) cancelBtn.remove();
+            if (selectBtn) selectBtn.remove();
             trackMarkers.forEach(marker => {
                 marker.setOptions({ visible: false }); // Hide the markers
             });
@@ -405,6 +428,26 @@
                 layer.setOptions({ visible: false }); // Hide the tracks
             })
         }
+    }
+
+    function cancelTrackSelection() {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+            data: {
+                action: 'cancelTrackSelection'
+            }
+        }));
+
+        // Clean up
+        const cancelBtn = document.getElementById('cancelTrackSelectionBtn');
+        const selectBtn = document.getElementById('selectTrackBtn');
+        if (cancelBtn) cancelBtn.remove();
+        if (selectBtn) selectBtn.remove();
+        trackMarkers.forEach(marker => {
+            marker.setOptions({ visible: false }); // Hide the markers
+        });
+        trackLineLayers.forEach(layer => {
+            layer.setOptions({ visible: false }); // Hide the tracks
+        })
     }
 
     function drawPath(track) {
@@ -447,6 +490,7 @@
                 selectedTrackLon = marker.getOptions().position[0];
                 selectedTrackLat = marker.getOptions().position[1];
                 showSelectTrackButton();
+                showCancelTrackSelectionButton();
                 window.ReactNativeWebView.postMessage(JSON.stringify({
                     data: {
                         action: 'log',
