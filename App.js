@@ -6,23 +6,25 @@ import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
 import * as SignalR from '@microsoft/signalr';
 import CreateEventSheet from './CreateEventSheet';
+import CreateEventDisplay from './CreateEventDisplay';
 import { get } from 'react-native/Libraries/TurboModule/TurboModuleRegistry';
 import { ConsoleLogger } from '@microsoft/signalr/dist/esm/Utils';
 
 export default function App() {
   const [userType, setUserType] = useState(null);
   const [connection, setConnection] = useState(null);
-  const sheetRef = useRef(null);
   const [isSheetVisible, setIsSheetVisible] = useState(false);
   const [isSelectingLocation, setIsSelectingLocation] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [tracks, setTracks] = useState([]);
   const [selectedTrack, setSelectedTrack] = useState(null);
-
+  const [isEventDisplayVisible, setIsEventDisplayVisible] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState(null);
   const [mapReady, setMapReady] = useState(false);
 
-  
   const webViewRef = useRef(null);
+  const eventDisplayRef = useRef(null);
+  const sheetRef = useRef(null);
 
   // Handle events:
   var eventList = {
@@ -160,6 +162,7 @@ export default function App() {
 
   const deleteEvent = async (id) => {
     try {
+      console.log("deleting event: ", id);
       const response = await fetch('https://runfuncionapp.azurewebsites.net/api/deleteEvent',{
       method: 'POST',
       headers: {
@@ -219,6 +222,13 @@ export default function App() {
       latitude: event.latitude,
       longitude: event.longitude,
       id: event.eventId,
+      name: event.name,
+      trackId: event.trackId,
+      startTime: event.start_time,
+      difficulty: event.difficulty,
+      type: event.type,
+      host: event.trainerId,
+      status: event.status,
     }));
     console.log('Event list:', eventList);
     webViewRef.current.postMessage(JSON.stringify(eventList));
@@ -240,6 +250,13 @@ export default function App() {
       latitude: event.latitude,
       longitude: event.longitude,
       id: event.eventId,
+      name: event.name,
+      trackId: event.trackId,
+      startTime: event.start_time,
+      difficulty: event.difficulty,
+      type: event.type,
+      host: event.trainerId,
+      status: event.status,
     }));
     webViewRef.current.postMessage(JSON.stringify(eventList));
     
@@ -274,6 +291,27 @@ const getAllTracks = async () => {
     }
   };
 
+  const getEventUsersForDisplay = async (id, eventObject) => {
+    try {
+      const response = await fetch(`https://runfuncionapp.azurewebsites.net/api/getEventRegisteredUsers`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        eventId: id,
+      }),
+      });
+      const data = await response.json();
+      eventObject["usersList"] = data;
+      setSelectedEvent(eventObject);
+      console.log('Got users:', data);
+    } catch (error) {
+      console.error('Error calling Azure Function:', error);
+      console.log('Error occurred');
+    }
+  };
+
   const handleSelectLocation = () => {
     console.log("Entering location select mode");
     setIsSelectingLocation(true);
@@ -289,6 +327,11 @@ const getAllTracks = async () => {
     sheetRef.current?.snapToIndex(-1);
     setIsSheetVisible(false); // hide sheet
   };
+
+  const openEventDisplay = () => {
+    eventDisplayRef.current?.snapToIndex(1);
+    setIsEventDisplayVisible(true);
+  }
 
   // Listen for messages from the map:
   const handleWebViewMessage = (event) => {
@@ -339,6 +382,9 @@ const getAllTracks = async () => {
         setMapReady(true);
         getAllOpenEvents();
         getAllTracks();
+      } else if (message.data.action === "openEventDisplay") {
+        getEventUsersForDisplay(message.data.eventObject.id, message.data.eventObject);
+        openEventDisplay();
       }
       
       else {
@@ -393,6 +439,16 @@ const getAllTracks = async () => {
               selectedTrack={selectedTrack}
               tracks={tracks}
               onClose={() => setIsSheetVisible(false)}
+            />
+          )}
+          {isEventDisplayVisible && (
+            <CreateEventDisplay
+              ref={eventDisplayRef}
+              joinEvent={joinEvent}
+              deleteEvent={deleteEvent}
+              eventObject={selectedEvent}
+              userId={"user123"}
+              onClose={() => setIsEventDisplayVisible(false)}
             />
           )}
         </View>

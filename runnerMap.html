@@ -180,10 +180,7 @@
                                 window.eventMarkers.push(marker);
 
                                 map.events.add('click', marker, () => {
-                                    document.getElementById('eventTitleDisplay').textContent = title || 'Untitled';
-                                    document.getElementById('eventCoords').textContent = `Lat: ${latitude}, Lng: ${longitude}`;
-                                    window.selectedEventId = id;
-                                    document.getElementById('eventMenu').style.display = 'block';
+                                    window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'openEventDisplay', eventObject: events[i]}}));
                                 });
 
                                 // For now, fake current user as 'me'
@@ -255,26 +252,7 @@
                 })
             })
         }
-        function handleJoin() {
-        const message = {
-            data: {
-                id: window.selectedEventId,
-                action: 'join'
-            }
-        };
-        window.ReactNativeWebView.postMessage(JSON.stringify(message));
-    }
-
-        function handleDelete() {
-            const message = {
-                data: {
-                    id: window.selectedEventId,
-                    action: 'delete'
-                }
-            };
-            window.ReactNativeWebView.postMessage(JSON.stringify(message));
-            getElementById('eventMenu').style.display = 'none';
-        }
+    
     let tempMarker = null;
     let trackingCenter = false;
 
@@ -513,15 +491,6 @@
 <body onload="getMap()">
     <div id="myMap"></div>
 
-    <div id="eventMenu" style="display: none;">
-        <div id="eventCard">
-            <h3 id="eventTitleDisplay">Event Title</h3>
-            <p id="eventCoords"></p>
-            <button onclick="handleJoin()">Join</button>
-            <button onclick="handleDelete()">Delete</button>
-            <button onclick="closeEventMenu()">Close</button>
-        </div>
-    </div>
     <button id="confirmLocationBtn"
         onclick="confirmLocation()"
         style="display:none;">
