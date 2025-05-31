@@ -196,7 +196,19 @@
                             // Update the "My Events" list
                             renderMyEventsList();
 
-                        } else if (type === 'userLocation') {
+                        } else if (type === "usersEvents"){
+                            usersEvents = data.events || [];
+
+                            console.log('Received users events:', usersEvents);
+                            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Received users events:' + usersEvents[2].name}}));
+                            usersEvents.forEach(event => {
+                                window.myEvents.push({ id: event.id, name: event.name, latitude: event.latitude, longitude: event.longitude });
+                            });
+                            // Update the "My Events" list
+                            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'I never get here'}}));
+                            renderMyEventsList();
+                        }
+                        else if (type === 'userLocation') {
                             const { location } = data;
 
                             if (!window.userMarker) {
@@ -501,8 +513,9 @@
     function renderMyEventsList() {
         const list = document.getElementById('myEventsList');
         list.innerHTML = ''; // Clear existing list
-
+        window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Im hererererer'}}));
         window.myEvents.forEach(event => {
+            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Inside handleEventList'}}));
             const li = document.createElement('li');
             li.textContent = event.name || 'Untitled Event';
             li.style.cursor = 'pointer';

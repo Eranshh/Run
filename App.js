@@ -265,7 +265,7 @@ export default function App() {
     const data = await response.json();
     console.log('Got Events:', data);
     // eventList.events = data;
-    eventList.events = data.map((event) => ({
+    let myEvents = data.map((event) => ({
       latitude: event.latitude,
       longitude: event.longitude,
       id: event.eventId,
@@ -277,7 +277,8 @@ export default function App() {
       host: event.trainerId,
       status: event.status,
     }));
-    webViewRef.current.postMessage(JSON.stringify(eventList));
+    let myEventsList = {type: 'usersEvents', events: myEvents};
+    webViewRef.current.postMessage(JSON.stringify(myEventsList));
     
   } catch (error) {
     console.error('Error calling Azure Function:', error);
@@ -397,6 +398,7 @@ const getAllTracks = async () => {
         setMapReady(true);
         getAllOpenEvents();
         getAllTracks();
+        getUsersEvents();
       } else if (message.data.action === "openEventDisplay") {
         getEventUsersForDisplay(message.data.eventObject.id, message.data.eventObject);
         openEventDisplay();
