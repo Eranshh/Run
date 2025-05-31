@@ -27,8 +27,7 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
   useEffect(() => {
     if (selectedTrack !== null) {
       //setFormValues((prev) => ({ ...prev, track: selectedTrack }));
-      setTrack(selectedTrack);
-      
+      setTrack(selectedTrack.trackId);
     }
   }, [selectedTrack]);
 
@@ -160,7 +159,6 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
         <Button
           title="Select Track From Map"
           onPress={handleSelectTrackFromMap}
-          color="#0078D4" // Optional styling
         />
         <Button title="Submit" onPress={handleSubmit} />
         <Button title="Close" onPress={() => ref.current?.close()} />

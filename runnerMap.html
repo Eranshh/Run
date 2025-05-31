@@ -157,16 +157,20 @@
                             // Clear existing markers
                             if (!window.eventMarkers) {
                                 window.eventMarkers = [];
-                            } else {
-                                window.eventMarkers.forEach(marker => map.markers.remove(marker));
-                                window.eventMarkers = [];
-                            }
+                            }// else {
+                            //    window.eventMarkers.forEach(marker => map.markers.remove(marker));
+                            //    window.eventMarkers = [];
+                            //}
 
                             // Store my events
-                            window.myEvents = [];
+                            if (!window.myEvents) {
+                                window.myEvents = [];
+                            }// else {
+                            //    window.myEvents.length = 0; // Clear existing events
+                            //}
 
                             for (let i = 0; i < events.length; i++) {
-                                const { latitude, longitude, id, title, userId } = events[i];
+                                const { latitude, longitude, id, name, host } = events[i];
                                 if (isNaN(latitude) || isNaN(longitude)) {
                                     console.warn(`⚠️ Skipping event ${id} due to invalid coordinates`);
                                     continue;
@@ -180,28 +184,31 @@
                                 window.eventMarkers.push(marker);
 
                                 map.events.add('click', marker, () => {
-                                    document.getElementById('eventTitleDisplay').textContent = title || 'Untitled';
-                                    document.getElementById('eventCoords').textContent = `Lat: ${latitude}, Lng: ${longitude}`;
-                                    window.selectedEventId = id;
-                                    document.getElementById('eventMenu').style.display = 'block';
+                                    window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'openEventDisplay', eventObject: events[i]}}));
                                 });
 
-                                // For now, fake current user as 'me'
-                                if (userId === 'me') {
-                                    window.myEvents.push({ id, title });
+                                // For now, fake current user as 'user123'
+                                if (host === 'user123') {
+                                    window.myEvents.push({ id, name, latitude, longitude });
                                 }
                             }
 
-                        // Update the "My Events" list
-                        const list = document.getElementById('myEventsList');
-                        list.innerHTML = '';
-                        window.myEvents.forEach(evt => {
-                            const li = document.createElement('li');
-                            li.textContent = evt.title || '(Untitled)';
-                            list.appendChild(li);
-                        });
+                            // Update the "My Events" list
+                            renderMyEventsList();
 
-                        } else if (type === 'userLocation') {
+                        } else if (type === "usersEvents"){
+                            usersEvents = data.events || [];
+
+                            console.log('Received users events:', usersEvents);
+                            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Received users events:' + usersEvents[2].name}}));
+                            usersEvents.forEach(event => {
+                                window.myEvents.push({ id: event.id, name: event.name, latitude: event.latitude, longitude: event.longitude });
+                            });
+                            // Update the "My Events" list
+                            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'I never get here'}}));
+                            renderMyEventsList();
+                        }
+                        else if (type === 'userLocation') {
                             const { location } = data;
 
                             if (!window.userMarker) {
@@ -255,26 +262,7 @@
                 })
             })
         }
-        function handleJoin() {
-        const message = {
-            data: {
-                id: window.selectedEventId,
-                action: 'join'
-            }
-        };
-        window.ReactNativeWebView.postMessage(JSON.stringify(message));
-    }
-
-        function handleDelete() {
-            const message = {
-                data: {
-                    id: window.selectedEventId,
-                    action: 'delete'
-                }
-            };
-            window.ReactNativeWebView.postMessage(JSON.stringify(message));
-            getElementById('eventMenu').style.display = 'none';
-        }
+    
     let tempMarker = null;
     let trackingCenter = false;
 
@@ -343,9 +331,13 @@
         document.getElementById('userMenu').style.display = 'none';
     }
     let trackMarkers = [];
+    let trackLineLayers = [];
     let selectedTrackId = null;
+    let selectedTrackLon = null;
+    let selectedTrackLat = null;
 
     function enableTrackSelection() {
+        showCancelTrackSelectionButton();
         // Assume window.trackMarkers is a list of track marker objects
         trackMarkers.forEach(marker => {
 
@@ -355,6 +347,10 @@
             //     highlightSelectedTrack(marker); // Optional: change color/style
             //     showSelectTrackButton();
             // });
+        });
+
+        window.eventMarkers.forEach(marker => {
+            marker.setOptions({ visible: false }); // Hide event markers
         });
     }
 
@@ -379,23 +375,82 @@
         }
     }
 
+    function showCancelTrackSelectionButton() {
+        if (!document.getElementById('cancelTrackSelectionBtn')) {
+            const btn = document.createElement('button');
+            btn.id = 'cancelTrackSelectionBtn';
+            btn.innerText = 'Cancel';
+            btn.style.position = 'fixed';
+            btn.style.bottom = '45px';
+            btn.style.left = '50%';
+            btn.style.transform = 'translateX(-50%)';
+            btn.style.zIndex = 1000;
+            btn.style.padding = '10px 20px';
+            btn.style.backgroundColor = '#0078D4';
+            btn.style.color = 'white';
+            btn.style.border = 'none';
+            btn.style.borderRadius = '8px';
+            btn.onclick = cancelTrackSelection;
+
+            document.body.appendChild(btn);
+        }
+    }
+
     function confirmSelectedTrack() {
         if (selectedTrackId) {
             window.ReactNativeWebView.postMessage(JSON.stringify({
                 data: {
                     action: 'trackSelected',
-                    trackId: selectedTrackId
+                    trackId: selectedTrackId,
+                    location: {
+                        longitude: selectedTrackLon,
+                        latitude: selectedTrackLat
+                    }
                 }
             }));
 
             // Clean up
-            const btn = document.getElementById('selectTrackBtn');
-            if (btn) btn.remove();
+            const cancelBtn = document.getElementById('cancelTrackSelectionBtn');
+            const selectBtn = document.getElementById('selectTrackBtn');
+            if (cancelBtn) cancelBtn.remove();
+            if (selectBtn) selectBtn.remove();
             trackMarkers.forEach(marker => {
                 marker.setOptions({ visible: false }); // Hide the markers
             });
+            trackLineLayers.forEach(layer => {
+                layer.setOptions({ visible: false }); // Hide the tracks
+            });
+
+            window.eventMarkers.forEach(marker => {
+            marker.setOptions({ visible: true }); // Show event markers
+            });
+
         }
     }
+
+    function cancelTrackSelection() {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+            data: {
+                action: 'cancelTrackSelection'
+            }
+        }));
+
+        // Clean up
+        const cancelBtn = document.getElementById('cancelTrackSelectionBtn');
+        const selectBtn = document.getElementById('selectTrackBtn');
+        if (cancelBtn) cancelBtn.remove();
+        if (selectBtn) selectBtn.remove();
+        trackMarkers.forEach(marker => {
+            marker.setOptions({ visible: false }); // Hide the markers
+        });
+        trackLineLayers.forEach(layer => {
+            layer.setOptions({ visible: false }); // Hide the tracks
+        })
+        window.eventMarkers.forEach(marker => {
+            marker.setOptions({ visible: true }); // Show event markers
+        });
+    }
+
     function drawPath(track) {
         let path = track.path || [];
         //window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: path}}));
@@ -426,13 +481,17 @@
                 strokeWidth: 3,
                 visible: false, // Initially hidden
             });
+            trackLineLayers.push(lineLayer);
             map.layers.add(lineLayer);
             map.events.add('click', marker, () => {
                 // Toggle visibility of the line layer
                 const isVisible = lineLayer.getOptions().visible;
                 lineLayer.setOptions({ visible: !isVisible });
                 selectedTrackId = marker.trackId; // or marker.metadata.id
+                selectedTrackLon = marker.getOptions().position[0];
+                selectedTrackLat = marker.getOptions().position[1];
                 showSelectTrackButton();
+                //showCancelTrackSelectionButton();
                 window.ReactNativeWebView.postMessage(JSON.stringify({
                     data: {
                         action: 'log',
@@ -450,20 +509,32 @@
             }));
         }
     }
+
+    function renderMyEventsList() {
+        const list = document.getElementById('myEventsList');
+        list.innerHTML = ''; // Clear existing list
+        window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Im hererererer'}}));
+        window.myEvents.forEach(event => {
+            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Inside handleEventList'}}));
+            const li = document.createElement('li');
+            li.textContent = event.name || 'Untitled Event';
+            li.style.cursor = 'pointer';
+            li.onclick = () => {
+            if (map && event.latitude && event.longitude) {
+                map.setCamera({
+                center: [event.longitude, event.latitude],
+                zoom: 15
+                });
+            }
+            };
+            list.appendChild(li);
+        });
+    }
     </script>
 </head>
 <body onload="getMap()">
     <div id="myMap"></div>
 
-    <div id="eventMenu" style="display: none;">
-        <div id="eventCard">
-            <h3 id="eventTitleDisplay">Event Title</h3>
-            <p id="eventCoords"></p>
-            <button onclick="handleJoin()">Join</button>
-            <button onclick="handleDelete()">Delete</button>
-            <button onclick="closeEventMenu()">Close</button>
-        </div>
-    </div>
     <button id="confirmLocationBtn"
         onclick="confirmLocation()"
         style="display:none;">
@@ -474,11 +545,12 @@
 <div id="userMenu" style="display:none;">
     <div id="userCard">
         <h3>User Info</h3>
-        <p>(Not signed in)</p>
+        <p>user123</p>
 
-        <h4>My Events</h4>
-        <ul id="myEventsList"></ul>
-
+        <div id="myEventsContainer">
+            <h4>My Events</h4>
+            <ul id="myEventsList"></ul>
+        </div>
         <button onclick="closeUserMenu()">Close</button>
     </div>
 </div>

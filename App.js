@@ -6,23 +6,25 @@ import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
 import * as SignalR from '@microsoft/signalr';
 import CreateEventSheet from './CreateEventSheet';
+import CreateEventDisplay from './CreateEventDisplay';
 import { get } from 'react-native/Libraries/TurboModule/TurboModuleRegistry';
 import { ConsoleLogger } from '@microsoft/signalr/dist/esm/Utils';
 
 export default function App() {
   const [userType, setUserType] = useState(null);
   const [connection, setConnection] = useState(null);
-  const sheetRef = useRef(null);
   const [isSheetVisible, setIsSheetVisible] = useState(false);
   const [isSelectingLocation, setIsSelectingLocation] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [tracks, setTracks] = useState([]);
   const [selectedTrack, setSelectedTrack] = useState(null);
-
+  const [isEventDisplayVisible, setIsEventDisplayVisible] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState(null);
   const [mapReady, setMapReady] = useState(false);
 
-  
   const webViewRef = useRef(null);
+  const eventDisplayRef = useRef(null);
+  const sheetRef = useRef(null);
 
   // Handle events:
   var eventList = {
@@ -54,12 +56,24 @@ export default function App() {
           console.log("Received message from SignalR:", message);
           const event_data = typeof message === 'string' ? JSON.parse(message) : message;
 
+          console.log("Parsed event data:", event_data);
+          if (!event_data || !event_data.latitude || !event_data.longitude || !event_data.RowKey) {
+            console.warn("Invalid event data received:", event_data);
+            return;
+          }
           // Add event to the local event list
           eventList.events.push({
             latitude: event_data.latitude,
             longitude: event_data.longitude,
             runners: [],
-            id: event_data.eventId
+            id: event_data.RowKey,
+            name: event_data.name || "Unnamed Event",
+            trackId: event_data.trackId || null,
+            startTime: event_data.start_time || 0,
+            difficulty: event_data.difficulty || "begginer",
+            type: event_data.type || "free run",
+            host: event_data.trainerId || "unknown",
+            status: event_data.status || "open",
           });
 
           eventList.len = (eventList.len || 0) + 1;
@@ -141,7 +155,14 @@ export default function App() {
         timestamp: new Date().toISOString(),
         latitude: event.latitude,
         longitude: event.longitude,
-        trainerId: 'user456'
+        trainerId: 'user123', // Replace with actual user ID
+        name: event.name,
+        trackId: event.trackId,
+        startTime: event.start_time,
+        difficulty: event.difficulty,
+        type: event.type,
+        host: event.trainerId,
+        status: event.status,
       }),
       });
       const data = await response.json();
@@ -160,6 +181,7 @@ export default function App() {
 
   const deleteEvent = async (id) => {
     try {
+      console.log("deleting event: ", id);
       const response = await fetch('https://runfuncionapp.azurewebsites.net/api/deleteEvent',{
       method: 'POST',
       headers: {
@@ -219,6 +241,13 @@ export default function App() {
       latitude: event.latitude,
       longitude: event.longitude,
       id: event.eventId,
+      name: event.name,
+      trackId: event.trackId,
+      startTime: event.start_time,
+      difficulty: event.difficulty,
+      type: event.type,
+      host: event.trainerId,
+      status: event.status,
     }));
     console.log('Event list:', eventList);
     webViewRef.current.postMessage(JSON.stringify(eventList));
@@ -236,12 +265,20 @@ export default function App() {
     const data = await response.json();
     console.log('Got Events:', data);
     // eventList.events = data;
-    eventList.events = data.map((event) => ({
+    let myEvents = data.map((event) => ({
       latitude: event.latitude,
       longitude: event.longitude,
       id: event.eventId,
+      name: event.name,
+      trackId: event.trackId,
+      startTime: event.start_time,
+      difficulty: event.difficulty,
+      type: event.type,
+      host: event.trainerId,
+      status: event.status,
     }));
-    webViewRef.current.postMessage(JSON.stringify(eventList));
+    let myEventsList = {type: 'usersEvents', events: myEvents};
+    webViewRef.current.postMessage(JSON.stringify(myEventsList));
     
   } catch (error) {
     console.error('Error calling Azure Function:', error);
@@ -274,6 +311,27 @@ const getAllTracks = async () => {
     }
   };
 
+  const getEventUsersForDisplay = async (id, eventObject) => {
+    try {
+      const response = await fetch(`https://runfuncionapp.azurewebsites.net/api/getEventRegisteredUsers`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        eventId: id,
+      }),
+      });
+      const data = await response.json();
+      eventObject["usersList"] = data;
+      setSelectedEvent(eventObject);
+      console.log('Got users:', data);
+    } catch (error) {
+      console.error('Error calling Azure Function:', error);
+      console.log('Error occurred');
+    }
+  };
+
   const handleSelectLocation = () => {
     console.log("Entering location select mode");
     setIsSelectingLocation(true);
@@ -289,6 +347,11 @@ const getAllTracks = async () => {
     sheetRef.current?.snapToIndex(-1);
     setIsSheetVisible(false); // hide sheet
   };
+
+  const openEventDisplay = () => {
+    eventDisplayRef.current?.snapToIndex(1);
+    setIsEventDisplayVisible(true);
+  }
 
   // Listen for messages from the map:
   const handleWebViewMessage = (event) => {
@@ -310,10 +373,6 @@ const getAllTracks = async () => {
       } else if (message.data.action === "getUserLocation") {
         console.log("sending location");
         getUserLocation();
-      }else if (message.data.action === "addEvent") {
-          console.log("creating event");
-          console.log(message.data.event);
-          createEvent(message.data.event);
       }else if (message.data.action === "confirmLocation") {
         console.log("Location confirmed:", message.data.location);
         setSelectedLocation(message.data.location);
@@ -321,10 +380,15 @@ const getAllTracks = async () => {
         // Reopen sheet
         sheetRef.current?.snapToIndex(1);
       } else if (message.data.action === 'trackSelected') {
-        console.log('Track selected:', message.data.trackId);
+        console.log('Track selected:', message.data.trackId, ' Longitude: ', message.data.longitude, ' Latitude: ' , message.data.latitude);
         const selectedTrackId = message.data.trackId;
         setSelectedTrack(selectedTrackId);
+        setSelectedLocation(message.data.location);
         openEventSheet();
+      } else if (message.data.action === 'cancelTrackSelection') {
+        console.log('Canceling track selection');
+        sheetRef.current?.snapToIndex(0);
+        setIsSheetVisible(false); // hide sheet
 
       } else if (message.data.action === "log"){
         //console.log("log message");
@@ -334,6 +398,10 @@ const getAllTracks = async () => {
         setMapReady(true);
         getAllOpenEvents();
         getAllTracks();
+        getUsersEvents();
+      } else if (message.data.action === "openEventDisplay") {
+        getEventUsersForDisplay(message.data.eventObject.id, message.data.eventObject);
+        openEventDisplay();
       }
       
       else {
@@ -388,6 +456,16 @@ const getAllTracks = async () => {
               selectedTrack={selectedTrack}
               tracks={tracks}
               onClose={() => setIsSheetVisible(false)}
+            />
+          )}
+          {isEventDisplayVisible && (
+            <CreateEventDisplay
+              ref={eventDisplayRef}
+              joinEvent={joinEvent}
+              deleteEvent={deleteEvent}
+              eventObject={selectedEvent}
+              userId={"user123"}
+              onClose={() => setIsEventDisplayVisible(false)}
             />
           )}
         </View>
