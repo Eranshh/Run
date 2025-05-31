@@ -155,8 +155,7 @@ export default function App() {
         timestamp: new Date().toISOString(),
         latitude: event.latitude,
         longitude: event.longitude,
-        trainerId: 'user456',
-              latitude: event.latitude,
+        trainerId: 'user123', // Replace with actual user ID
         name: event.name,
         trackId: event.trackId,
         startTime: event.start_time,
