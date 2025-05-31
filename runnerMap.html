@@ -157,13 +157,17 @@
                             // Clear existing markers
                             if (!window.eventMarkers) {
                                 window.eventMarkers = [];
-                            } else {
-                                window.eventMarkers.forEach(marker => map.markers.remove(marker));
-                                window.eventMarkers = [];
-                            }
+                            }// else {
+                            //    window.eventMarkers.forEach(marker => map.markers.remove(marker));
+                            //    window.eventMarkers = [];
+                            //}
 
                             // Store my events
-                            window.myEvents = [];
+                            if (!window.myEvents) {
+                                window.myEvents = [];
+                            }// else {
+                            //    window.myEvents.length = 0; // Clear existing events
+                            //}
 
                             for (let i = 0; i < events.length; i++) {
                                 const { latitude, longitude, id, title, userId } = events[i];

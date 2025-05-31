@@ -56,12 +56,24 @@ export default function App() {
           console.log("Received message from SignalR:", message);
           const event_data = typeof message === 'string' ? JSON.parse(message) : message;
 
+          console.log("Parsed event data:", event_data);
+          if (!event_data || !event_data.latitude || !event_data.longitude || !event_data.RowKey) {
+            console.warn("Invalid event data received:", event_data);
+            return;
+          }
           // Add event to the local event list
           eventList.events.push({
             latitude: event_data.latitude,
             longitude: event_data.longitude,
             runners: [],
-            id: event_data.eventId
+            id: event_data.RowKey,
+            name: event_data.name || "Unnamed Event",
+            trackId: event_data.trackId || null,
+            startTime: event_data.start_time || 0,
+            difficulty: event_data.difficulty || "begginer",
+            type: event_data.type || "free run",
+            host: event_data.trainerId || "unknown",
+            status: event_data.status || "open",
           });
 
           eventList.len = (eventList.len || 0) + 1;
@@ -353,10 +365,6 @@ const getAllTracks = async () => {
       } else if (message.data.action === "getUserLocation") {
         console.log("sending location");
         getUserLocation();
-      }else if (message.data.action === "addEvent") {
-          console.log("creating event");
-          console.log(message.data.event);
-          createEvent(message.data.event);
       }else if (message.data.action === "confirmLocation") {
         console.log("Location confirmed:", message.data.location);
         setSelectedLocation(message.data.location);
