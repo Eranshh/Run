@@ -155,7 +155,15 @@ export default function App() {
         timestamp: new Date().toISOString(),
         latitude: event.latitude,
         longitude: event.longitude,
-        trainerId: 'user456'
+        trainerId: 'user456',
+              latitude: event.latitude,
+        name: event.name,
+        trackId: event.trackId,
+        startTime: event.start_time,
+        difficulty: event.difficulty,
+        type: event.type,
+        host: event.trainerId,
+        status: event.status,
       }),
       });
       const data = await response.json();
