@@ -570,16 +570,24 @@
         let freeRunStartTime = null;
         let freeRunPolylineSource = null;
         let freeRunDataSource = null;
-
+        let runStartTime = null;
+        let runTimerInterval = null;
+        let totalPausedTime = 0;
+        let pauseStartTime = null;
 
         function startFreeRun() {
             freeRunActive = true;
             freeRunPaused = false;
             freeRunPath = [];
             freeRunStartTime = Date.now();
+            totalPausedTime = 0;
 
             window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Free run started'}}));
             console.log('Free run started at', new Date(freeRunStartTime).toLocaleString());
+
+            runStartTime = new Date();
+            updateRunTimer(); // Immediately update UI
+            runTimerInterval = setInterval(updateRunTimer, 1000);
 
             document.getElementById('startFreeRunBtn').style.display = 'none';
             document.getElementById('pauseFreeRunBtn').style.display = 'inline';
@@ -594,16 +602,22 @@
                 strokeWidth: 3
                 }));
             }
+
+            //document.getElementById('createEventBtn').style.display = 'none'; // Hide create event button
+
+            window.eventMarkers.forEach(marker => {
+                marker.setOptions({ visible: false }); // Hide event markers
+            });
         }
 
         function freeRunLoc(location){
             if (!freeRunActive || freeRunPaused) return;
             window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Free run location updated with coords: ' + JSON.stringify(location.coords)}}));
-            const { latitude, longitude, speed } = location.coords;
+            const { latitude, longitude, speed, heading } = location.coords;
             const point = [longitude, latitude];
             window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'This is point: ' + JSON.stringify(point)}}));
             freeRunPath.push(point);
-            map.setCamera({ center: point , zoom: 20});
+            map.setCamera({ center: point , zoom: 20, bearing: heading ?? 0, pitch: 60 });
 
             const line = new atlas.data.LineString(freeRunPath);
             freeRunDataSource.setShapes([new atlas.data.Feature(line)]);
@@ -621,37 +635,56 @@
         }
 
         function pauseFreeRun() {
-        freeRunPaused = !freeRunPaused;
-        document.getElementById('pauseFreeRunBtn').textContent = freeRunPaused ? '▶️' : '⏸️';
+            freeRunPaused = !freeRunPaused;
+            document.getElementById('pauseFreeRunBtn').textContent = freeRunPaused ? '▶️' : '⏸️';
+            if(freeRunPaused){
+                pauseStartTime = new Date();
+
+            }else{
+                const now = new Date();
+                totalPausedTime += now - pauseStartTime;
+                pauseStartTime = null;
+            }
         }
 
         function stopFreeRun() {
-        freeRunActive = false;
-        navigator.geolocation.clearWatch(freeRunWatchId);
+            freeRunActive = false;
+            navigator.geolocation.clearWatch(freeRunWatchId);
 
-        document.getElementById('startFreeRunBtn').style.display = 'inline';
-        document.getElementById('pauseFreeRunBtn').style.display = 'none';
-        document.getElementById('stopFreeRunBtn').style.display = 'none';
-        document.getElementById('runStats').style.display = 'none';
+            document.getElementById('startFreeRunBtn').style.display = 'inline';
+            document.getElementById('pauseFreeRunBtn').style.display = 'none';
+            document.getElementById('stopFreeRunBtn').style.display = 'none';
+            document.getElementById('runStats').style.display = 'none';
 
-        console.log('Run complete. Total path:', freeRunPath);
+            console.log('Run complete. Total path:', freeRunPath);
+            if (runTimerInterval) {
+                clearInterval(runTimerInterval);
+                runTimerInterval = null;
+            }
+            //document.getElementById('createEventBtn').style.display = 'inline'; // Show create event button
+            window.eventMarkers.forEach(marker => {
+                marker.setOptions({ visible: true }); // Show event markers
+            });
         }
 
         function calculateTotalDistance(coords) {
-        if (coords.length < 2) return 0;
-        let d = 0;
-        for (let i = 1; i < coords.length; i++) {
-            d += atlas.math.getDistanceTo(coords[i - 1], coords[i], 'meters');
-        }
-        return d;
+            if (coords.length < 2) return 0;
+            let d = 0;
+            for (let i = 1; i < coords.length; i++) {
+                d += atlas.math.getDistanceTo(coords[i - 1], coords[i], 'meters');
+            }
+
+
+
+            return d;
         }
 
         function estimateCalories(distanceMeters) {
-        const distanceKm = distanceMeters / 1000;
-        const MET = 9.8;
-        const weightKg = 70;
-        const hours = (Date.now() - freeRunStartTime) / (1000 * 60 * 60);
-        return MET * weightKg * hours;
+            const distanceKm = distanceMeters / 1000;
+            const MET = 9.8;
+            const weightKg = 70;
+            const hours = (Date.now() - freeRunStartTime) / (1000 * 60 * 60);
+            return MET * weightKg * hours;
         }
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -659,6 +692,18 @@
             document.getElementById('pauseFreeRunBtn').onclick = pauseFreeRun;
             document.getElementById('stopFreeRunBtn').onclick = stopFreeRun;
         });
+
+        function updateRunTimer() {
+            if (!runStartTime || freeRunPaused) return;
+                const now = new Date();
+                const elapsed = Math.floor((now - runStartTime - totalPausedTime) / 1000); // in seconds
+
+                const hours = String(Math.floor(elapsed / 3600)).padStart(2, '0');
+                const minutes = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
+                const seconds = String(elapsed % 60).padStart(2, '0');
+
+                document.getElementById('runTime').textContent = `${hours}:${minutes}:${seconds}`;
+        }
 
 
         // free run ends here
@@ -694,6 +739,7 @@
 </div>
 
 <div id="runStats" style="display: none; position: absolute; top: 10px; left: 10px; background: rgba(255,255,255,0.8); padding: 8px; border-radius: 8px; z-index: 1000;">
+  <p>Time: <span id="runTime">00:00:00</span></p>
   <p>Speed: <span id="runSpeed">0</span> km/h</p>
   <p>Distance: <span id="runDistance">0</span> m</p>
   <p>Pace: <span id="runPace">0</span> min/km</p>

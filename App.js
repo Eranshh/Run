@@ -442,7 +442,7 @@ const getAllTracks = async () => {
           onMessage={handleWebViewMessage}
           />
           {!isSelectingLocation && (
-            <TouchableOpacity style={styles.fab} onPress={openEventSheet}>
+            <TouchableOpacity id="createEventBtn" style={styles.fab} onPress={openEventSheet}>
               <Text style={styles.fabText}>+</Text>
             </TouchableOpacity>
           )}
