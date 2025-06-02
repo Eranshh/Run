@@ -9,23 +9,6 @@
         html, body { margin: 0; padding: 0; height: 100%; width: 100%; }
         #myMap { width: 100%; height: 100vh; }
 
-
-        /* #startFreeRunBtn  {
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            font-size: 32px;
-            background-color: #0078D4;
-            color: white;
-            border: none;
-            cursor: pointer;
-            z-index: 1000;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-        } */
-
         #stopFreeRunBtn  {
             position: fixed;
             bottom: 20px;
@@ -170,8 +153,6 @@
             });
 
             map.events.add('ready', function() {
-                //window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Map ready'}}));
-                //console.log('Map ready');
 
                 // Wait a short moment to ensure the camera is settled
                 window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'mapReady'}}));
@@ -191,17 +172,12 @@
                             // Clear existing markers
                             if (!window.eventMarkers) {
                                 window.eventMarkers = [];
-                            }// else {
-                            //    window.eventMarkers.forEach(marker => map.markers.remove(marker));
-                            //    window.eventMarkers = [];
-                            //}
+                            }
 
                             // Store my events
                             if (!window.myEvents) {
                                 window.myEvents = [];
-                            }// else {
-                            //    window.myEvents.length = 0; // Clear existing events
-                            //}
+                            }
 
                             for (let i = 0; i < events.length; i++) {
                                 const { latitude, longitude, id, name, host } = events[i];
@@ -378,11 +354,6 @@
         trackMarkers.forEach(marker => {
 
             marker.setOptions({ visible: true }); // Show the marker
-            // map.events.add('click', marker, () => {
-            //     selectedTrackId = marker.trackId; // or marker.metadata.id
-            //     highlightSelectedTrack(marker); // Optional: change color/style
-            //     showSelectTrackButton();
-            // });
         });
 
         window.eventMarkers.forEach(marker => {
@@ -489,9 +460,7 @@
 
     function drawPath(track) {
         let path = track.path || [];
-        //window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: path}}));
         try{
-
             const marker = new atlas.HtmlMarker({
                 position: path[0],
                 text: 'T',
@@ -527,13 +496,6 @@
                 selectedTrackLon = marker.getOptions().position[0];
                 selectedTrackLat = marker.getOptions().position[1];
                 showSelectTrackButton();
-                //showCancelTrackSelectionButton();
-                window.ReactNativeWebView.postMessage(JSON.stringify({
-                    data: {
-                        action: 'log',
-                        message: `Toggled path visibility: ${!isVisible}`
-                    }
-                }));
             });
         }   catch (err) {
             console.error("Failed to draw path:", err);
@@ -578,40 +540,54 @@
         let totalRunTime = 0
 
         function startFreeRun() {
-            freeRunActive = true;
-            freeRunPaused = false;
-            freeRunPath = [];
-            freeRunStartTime = Date.now();
-            totalPausedTime = 0;
-            totalRunTime = 0;
+            const overlay = document.getElementById('countdownOverlay');
+            const text = document.getElementById('countdownText');
+            overlay.style.display = 'flex';
+            let count = 3;
 
             window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'enterFreeRunMode'}}))
-            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Free run started'}}));
-            console.log('Free run started at', new Date(freeRunStartTime).toLocaleString());
 
-            runStartTime = new Date();
-            updateRunTimer(); // Immediately update UI
-            runTimerInterval = setInterval(updateRunTimer, 1000);
+            text.textContent = count;
+            const countdownInterval = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    text.textContent = count;
+                } else {
+                    clearInterval(countdownInterval);
+                    overlay.style.display = 'none';
 
-            //document.getElementById('startFreeRunBtn').style.display = 'none';
-            document.getElementById('pauseFreeRunBtn').style.display = 'inline';
-            document.getElementById('stopFreeRunBtn').style.display = 'inline';
-            document.getElementById('runStats').style.display = 'block';
+                    freeRunActive = true;
+                    freeRunPaused = false;
+                    freeRunPath = [];
+                    freeRunStartTime = Date.now();
+                    totalPausedTime = 0;
+                    totalRunTime = 0;
 
-            if (!freeRunDataSource) {
-                freeRunDataSource = new atlas.source.DataSource();
-                map.sources.add(freeRunDataSource);
-                map.layers.add(new atlas.layer.LineLayer(freeRunDataSource, null, {
-                strokeColor: 'blue',
-                strokeWidth: 3
-                }));
-            }
+                    window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Free run started'}}));
+                    console.log('Free run started at', new Date(freeRunStartTime).toLocaleString());
 
-            //document.getElementById('createEventBtn').style.display = 'none'; // Hide create event button
+                    runStartTime = new Date();
+                    updateRunTimer(); // Immediately update UI
+                    runTimerInterval = setInterval(updateRunTimer, 1000);
 
-            window.eventMarkers.forEach(marker => {
-                marker.setOptions({ visible: false }); // Hide event markers
-            });
+                    document.getElementById('pauseFreeRunBtn').style.display = 'inline';
+                    document.getElementById('stopFreeRunBtn').style.display = 'inline';
+                    document.getElementById('runStats').style.display = 'block';
+
+                    if (!freeRunDataSource) {
+                        freeRunDataSource = new atlas.source.DataSource();
+                        map.sources.add(freeRunDataSource);
+                        map.layers.add(new atlas.layer.LineLayer(freeRunDataSource, null, {
+                            strokeColor: 'blue',
+                            strokeWidth: 3
+                        }));
+                    }
+
+                    window.eventMarkers.forEach(marker => {
+                        marker.setOptions({ visible: false }); // Hide event markers
+                    });
+                }
+            }, 1000);
         }
 
         function freeRunLoc(location){
@@ -654,9 +630,7 @@
         function stopFreeRun() {
             window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'entering stop run'}}));
             freeRunActive = false;
-            //navigator.geolocation.clearWatch(freeRunWatchId);
 
-            //document.getElementById('startFreeRunBtn').style.display = 'inline';
             document.getElementById('pauseFreeRunBtn').style.display = 'none';
             document.getElementById('stopFreeRunBtn').style.display = 'none';
             document.getElementById('runStats').style.display = 'none';
@@ -666,7 +640,6 @@
                 clearInterval(runTimerInterval);
                 runTimerInterval = null;
             }
-            //document.getElementById('createEventBtn').style.display = 'inline'; // Show create event button
             window.eventMarkers.forEach(marker => {
                 marker.setOptions({ visible: true }); // Show event markers
             });
@@ -713,7 +686,6 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            //document.getElementById('startFreeRunBtn').onclick = startFreeRun;
             document.getElementById('pauseFreeRunBtn').onclick = pauseFreeRun;
             document.getElementById('stopFreeRunBtn').onclick = stopFreeRun;
         });
@@ -732,7 +704,6 @@
 
                 document.getElementById('runTime').textContent = `${hours}:${minutes}:${seconds}`;
         }
-
 
         // free run ends here
 
@@ -761,7 +732,6 @@
     </div>
 </div>
 <div id="freeRunControls" style="position: absolute; top: 10px; left: 10px; z-index: 1000;">
-  <!-- <button id="startFreeRunBtn">🏃</button> -->
   <button id="pauseFreeRunBtn" style="display:none;">⏸️</button>
   <button id="stopFreeRunBtn" style="display:none;">⏹</button>
 </div>
@@ -783,6 +753,10 @@
   <p><strong>Calories:</strong> <span id="summaryCalories">--</span></p>
   <div id="summaryMap" style="height: 200px; margin-top: 15px;"></div>
   <button onclick="closeRunSummary()">Close</button>
+</div>
+
+<div id="countdownOverlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); color: white; font-size: 64px; font-weight: bold; align-items: center; justify-content: center; z-index: 2000;">
+  <div id="countdownText">3</div>
 </div>
 
 </body>

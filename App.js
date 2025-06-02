@@ -116,8 +116,8 @@ export default function App() {
       watcher = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.High,
-          timeInterval: 3000,
-          distanceInterval: 5,
+          timeInterval: 2000,
+          distanceInterval: 1,
         },
         (location) => {
           // Send updated location to the WebView
