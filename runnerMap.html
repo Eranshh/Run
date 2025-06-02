@@ -291,11 +291,12 @@
             tempMarker = new atlas.HtmlMarker({
                 position: center,
                 draggable: false,
-                color: 'DodgerBlue'
+                color: 'DodgerBlue',
+                visible: true
             });
             map.markers.add(tempMarker);
         } else {
-            tempMarker.setOptions({ position: center });
+            tempMarker.setOptions({ position: center, visible: true });
         }
 
         // Move the marker as the map moves
@@ -317,6 +318,8 @@
         map.events.remove('move', updateMarkerPosition);
 
         const pos = tempMarker.getOptions().position;
+
+        tempMarker.setOptions({ visible: false });
 
         window.ReactNativeWebView.postMessage(JSON.stringify({
             data: {
