@@ -574,6 +574,7 @@
         let runTimerInterval = null;
         let totalPausedTime = 0;
         let pauseStartTime = null;
+        let totalRunTime = 0
 
         function startFreeRun() {
             freeRunActive = true;
@@ -581,6 +582,7 @@
             freeRunPath = [];
             freeRunStartTime = Date.now();
             totalPausedTime = 0;
+            totalRunTime = 0;
 
             window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Free run started'}}));
             console.log('Free run started at', new Date(freeRunStartTime).toLocaleString());
@@ -648,8 +650,9 @@
         }
 
         function stopFreeRun() {
+            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'entering stop run'}}));
             freeRunActive = false;
-            navigator.geolocation.clearWatch(freeRunWatchId);
+            //navigator.geolocation.clearWatch(freeRunWatchId);
 
             document.getElementById('startFreeRunBtn').style.display = 'inline';
             document.getElementById('pauseFreeRunBtn').style.display = 'none';
@@ -665,6 +668,27 @@
             window.eventMarkers.forEach(marker => {
                 marker.setOptions({ visible: true }); // Show event markers
             });
+            map.setCamera({ zoom: 15, bearing: 0, pitch: 0 });
+
+            const totalDistance = calculateTotalDistance(freeRunPath);
+            // Display summary
+            document.getElementById('runStats').style.display = 'none';
+            document.getElementById('runSummary').style.display = 'block';
+            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'showing run summary menu'}}));
+
+            // Set stats
+            document.getElementById('summaryTime').textContent = document.getElementById('runTime').textContent;
+            document.getElementById('summaryDistance').textContent = totalDistance.toFixed(1);
+            document.getElementById('summaryCalories').textContent = estimateCaloriesBurned(totalDistance);
+
+            const pace = totalDistance > 0 ? (totalRunTime / 60) / (totalDistance / 1000) : 0;
+            document.getElementById('summaryPace').textContent = pace.toFixed(2);
+
+            // drawSummaryRoute();
+        }
+
+        function closeRunSummary() {
+            document.getElementById('runSummary').style.display = 'none';
         }
 
         function calculateTotalDistance(coords) {
@@ -673,9 +697,6 @@
             for (let i = 1; i < coords.length; i++) {
                 d += atlas.math.getDistanceTo(coords[i - 1], coords[i], 'meters');
             }
-
-
-
             return d;
         }
 
@@ -697,6 +718,9 @@
             if (!runStartTime || freeRunPaused) return;
                 const now = new Date();
                 const elapsed = Math.floor((now - runStartTime - totalPausedTime) / 1000); // in seconds
+
+                totalRunTime = elapsed; // Update total run time
+
 
                 const hours = String(Math.floor(elapsed / 3600)).padStart(2, '0');
                 const minutes = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
@@ -744,6 +768,17 @@
   <p>Distance: <span id="runDistance">0</span> m</p>
   <p>Pace: <span id="runPace">0</span> min/km</p>
   <p>Calories: <span id="runCalories">0</span></p>
+</div>
+
+
+<div id="runSummary" style="display: none; position: absolute; top: 10%; left: 5%; right: 5%; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 0 10px rgba(0,0,0,0.3); z-index: 1000;">
+  <h2>Run Summary</h2>
+  <p><strong>Time:</strong> <span id="summaryTime">--</span></p>
+  <p><strong>Distance:</strong> <span id="summaryDistance">--</span> m</p>
+  <p><strong>Avg Pace:</strong> <span id="summaryPace">--</span> min/km</p>
+  <p><strong>Calories:</strong> <span id="summaryCalories">--</span></p>
+  <div id="summaryMap" style="height: 200px; margin-top: 15px;"></div>
+  <button onclick="closeRunSummary()">Close</button>
 </div>
 
 </body>
