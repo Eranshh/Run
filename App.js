@@ -380,7 +380,7 @@ const getAllTracks = async () => {
         // Reopen sheet
         sheetRef.current?.snapToIndex(1);
       } else if (message.data.action === 'trackSelected') {
-        console.log('Track selected:', message.data.trackId, ' Longitude: ', message.data.longitude, ' Latitude: ' , message.data.latitude);
+        console.log('Track selected:', message.data.trackId, ' Longitude: ', message.data.location.longitude, ' Latitude: ' , message.data.location.latitude);
         const selectedTrackId = message.data.trackId;
         setSelectedTrack(selectedTrackId);
         setSelectedLocation(message.data.location);
