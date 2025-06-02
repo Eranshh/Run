@@ -157,6 +157,7 @@
 
     <script>
         let map;
+        let freeRunActive = false;
         function getMap() {
             map = new atlas.Map('myMap', {
                 center: [34.8, 32.1],
@@ -241,6 +242,8 @@
                         }
                         else if (type === 'userLocation') {
                             const { location } = data;
+                            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'updating location: ' + JSON.stringify(location.coords)}}));
+                            freeRunLoc(location);
 
                             if (!window.userMarker) {
                                 window.userMarker = new atlas.HtmlMarker({
@@ -561,7 +564,6 @@
         });
     }
         // Free Run functionality
-        let freeRunActive = false;
         let freeRunPaused = false;
         let freeRunPath = [];
         let freeRunWatchId = null;
@@ -571,36 +573,37 @@
 
 
         function startFreeRun() {
-        freeRunActive = true;
-        freeRunPaused = false;
-        freeRunPath = [];
-        freeRunStartTime = Date.now();
+            freeRunActive = true;
+            freeRunPaused = false;
+            freeRunPath = [];
+            freeRunStartTime = Date.now();
 
-        window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Free run started'}}));
-        console.log('Free run started at', new Date(freeRunStartTime).toLocaleString());
+            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Free run started'}}));
+            console.log('Free run started at', new Date(freeRunStartTime).toLocaleString());
 
-        document.getElementById('startFreeRunBtn').style.display = 'none';
-        document.getElementById('pauseFreeRunBtn').style.display = 'inline';
-        document.getElementById('stopFreeRunBtn').style.display = 'inline';
-        document.getElementById('runStats').style.display = 'block';
+            document.getElementById('startFreeRunBtn').style.display = 'none';
+            document.getElementById('pauseFreeRunBtn').style.display = 'inline';
+            document.getElementById('stopFreeRunBtn').style.display = 'inline';
+            document.getElementById('runStats').style.display = 'block';
 
-        if (!freeRunDataSource) {
-            freeRunDataSource = new atlas.source.DataSource();
-            map.sources.add(freeRunDataSource);
-            map.layers.add(new atlas.layer.LineLayer(freeRunDataSource, null, {
-            strokeColor: 'blue',
-            strokeWidth: 3
-            }));
+            if (!freeRunDataSource) {
+                freeRunDataSource = new atlas.source.DataSource();
+                map.sources.add(freeRunDataSource);
+                map.layers.add(new atlas.layer.LineLayer(freeRunDataSource, null, {
+                strokeColor: 'blue',
+                strokeWidth: 3
+                }));
+            }
         }
 
-        freeRunWatchId = navigator.geolocation.watchPosition(position => {
+        function freeRunLoc(location){
             if (!freeRunActive || freeRunPaused) return;
-
-            const { latitude, longitude, speed } = position.coords;
+            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Free run location updated with coords: ' + JSON.stringify(location.coords)}}));
+            const { latitude, longitude, speed } = location.coords;
             const point = [longitude, latitude];
+            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'This is point: ' + JSON.stringify(point)}}));
             freeRunPath.push(point);
-
-            map.setCamera({ center: point });
+            map.setCamera({ center: point , zoom: 20});
 
             const line = new atlas.data.LineString(freeRunPath);
             freeRunDataSource.setShapes([new atlas.data.Feature(line)]);
@@ -615,9 +618,6 @@
             document.getElementById('runDistance').textContent = distance.toFixed(1);
             document.getElementById('runPace').textContent = pace.toFixed(2);
             document.getElementById('runCalories').textContent = cal.toFixed(0);
-        }, err => {
-            alert('Location error: ' + err.message);
-        }, { enableHighAccuracy: true });
         }
 
         function pauseFreeRun() {

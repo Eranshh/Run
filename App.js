@@ -117,7 +117,7 @@ export default function App() {
         {
           accuracy: Location.Accuracy.High,
           timeInterval: 3000,
-          distanceInterval: 5,
+          distanceInterval: 0,
         },
         (location) => {
           // Send updated location to the WebView
