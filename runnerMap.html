@@ -9,15 +9,48 @@
         html, body { margin: 0; padding: 0; height: 100%; width: 100%; }
         #myMap { width: 100%; height: 100vh; }
 
-        .reactAddEventBtn  {
+
+        #startFreeRunBtn  {
             position: fixed;
             bottom: 20px;
-            right: 20px;
+            left: 20px;
             width: 60px;
             height: 60px;
             border-radius: 50%;
             font-size: 32px;
             background-color: #0078D4;
+            color: white;
+            border: none;
+            cursor: pointer;
+            z-index: 1000;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+
+        #stopFreeRunBtn  {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            font-size: 32px;
+            background-color: red;
+            color: white;
+            border: none;
+            cursor: pointer;
+            z-index: 1000;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+
+        #pauseFreeRunBtn  {
+            position: fixed;
+            bottom: 20px;
+            left: 100px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            font-size: 32px;
+            background-color: orange;
             color: white;
             border: none;
             cursor: pointer;
@@ -204,8 +237,6 @@
                             usersEvents.forEach(event => {
                                 window.myEvents.push({ id: event.id, name: event.name, latitude: event.latitude, longitude: event.longitude });
                             });
-                            // Update the "My Events" list
-                            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'I never get here'}}));
                             renderMyEventsList();
                         }
                         else if (type === 'userLocation') {
@@ -513,7 +544,6 @@
     function renderMyEventsList() {
         const list = document.getElementById('myEventsList');
         list.innerHTML = ''; // Clear existing list
-        window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Im hererererer'}}));
         window.myEvents.forEach(event => {
             window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Inside handleEventList'}}));
             const li = document.createElement('li');
@@ -530,6 +560,109 @@
             list.appendChild(li);
         });
     }
+        // Free Run functionality
+        let freeRunActive = false;
+        let freeRunPaused = false;
+        let freeRunPath = [];
+        let freeRunWatchId = null;
+        let freeRunStartTime = null;
+        let freeRunPolylineSource = null;
+        let freeRunDataSource = null;
+
+
+        function startFreeRun() {
+        freeRunActive = true;
+        freeRunPaused = false;
+        freeRunPath = [];
+        freeRunStartTime = Date.now();
+
+        window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Free run started'}}));
+        console.log('Free run started at', new Date(freeRunStartTime).toLocaleString());
+
+        document.getElementById('startFreeRunBtn').style.display = 'none';
+        document.getElementById('pauseFreeRunBtn').style.display = 'inline';
+        document.getElementById('stopFreeRunBtn').style.display = 'inline';
+        document.getElementById('runStats').style.display = 'block';
+
+        if (!freeRunDataSource) {
+            freeRunDataSource = new atlas.source.DataSource();
+            map.sources.add(freeRunDataSource);
+            map.layers.add(new atlas.layer.LineLayer(freeRunDataSource, null, {
+            strokeColor: 'blue',
+            strokeWidth: 3
+            }));
+        }
+
+        freeRunWatchId = navigator.geolocation.watchPosition(position => {
+            if (!freeRunActive || freeRunPaused) return;
+
+            const { latitude, longitude, speed } = position.coords;
+            const point = [longitude, latitude];
+            freeRunPath.push(point);
+
+            map.setCamera({ center: point });
+
+            const line = new atlas.data.LineString(freeRunPath);
+            freeRunDataSource.setShapes([new atlas.data.Feature(line)]);
+
+            const distance = calculateTotalDistance(freeRunPath);
+            const elapsed = (Date.now() - freeRunStartTime) / 1000;
+            const pace = distance > 0 ? (elapsed / 60) / (distance / 1000) : 0;
+            const cal = estimateCalories(distance);
+            const spd = speed ? (speed * 3.6).toFixed(1) : '0';
+
+            document.getElementById('runSpeed').textContent = spd;
+            document.getElementById('runDistance').textContent = distance.toFixed(1);
+            document.getElementById('runPace').textContent = pace.toFixed(2);
+            document.getElementById('runCalories').textContent = cal.toFixed(0);
+        }, err => {
+            alert('Location error: ' + err.message);
+        }, { enableHighAccuracy: true });
+        }
+
+        function pauseFreeRun() {
+        freeRunPaused = !freeRunPaused;
+        document.getElementById('pauseFreeRunBtn').textContent = freeRunPaused ? '▶️' : '⏸️';
+        }
+
+        function stopFreeRun() {
+        freeRunActive = false;
+        navigator.geolocation.clearWatch(freeRunWatchId);
+
+        document.getElementById('startFreeRunBtn').style.display = 'inline';
+        document.getElementById('pauseFreeRunBtn').style.display = 'none';
+        document.getElementById('stopFreeRunBtn').style.display = 'none';
+        document.getElementById('runStats').style.display = 'none';
+
+        console.log('Run complete. Total path:', freeRunPath);
+        }
+
+        function calculateTotalDistance(coords) {
+        if (coords.length < 2) return 0;
+        let d = 0;
+        for (let i = 1; i < coords.length; i++) {
+            d += atlas.math.getDistanceTo(coords[i - 1], coords[i], 'meters');
+        }
+        return d;
+        }
+
+        function estimateCalories(distanceMeters) {
+        const distanceKm = distanceMeters / 1000;
+        const MET = 9.8;
+        const weightKg = 70;
+        const hours = (Date.now() - freeRunStartTime) / (1000 * 60 * 60);
+        return MET * weightKg * hours;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('startFreeRunBtn').onclick = startFreeRun;
+            document.getElementById('pauseFreeRunBtn').onclick = pauseFreeRun;
+            document.getElementById('stopFreeRunBtn').onclick = stopFreeRun;
+        });
+
+
+        // free run ends here
+
     </script>
 </head>
 <body onload="getMap()">
@@ -554,5 +687,18 @@
         <button onclick="closeUserMenu()">Close</button>
     </div>
 </div>
+<div id="freeRunControls" style="position: absolute; top: 10px; left: 10px; z-index: 1000;">
+  <button id="startFreeRunBtn">🏃</button>
+  <button id="pauseFreeRunBtn" style="display:none;">⏸️</button>
+  <button id="stopFreeRunBtn" style="display:none;">⏹</button>
+</div>
+
+<div id="runStats" style="display: none; position: absolute; top: 10px; left: 10px; background: rgba(255,255,255,0.8); padding: 8px; border-radius: 8px; z-index: 1000;">
+  <p>Speed: <span id="runSpeed">0</span> km/h</p>
+  <p>Distance: <span id="runDistance">0</span> m</p>
+  <p>Pace: <span id="runPace">0</span> min/km</p>
+  <p>Calories: <span id="runCalories">0</span></p>
+</div>
+
 </body>
 </html>
