@@ -10,7 +10,7 @@
         #myMap { width: 100%; height: 100vh; }
 
 
-        #startFreeRunBtn  {
+        /* #startFreeRunBtn  {
             position: fixed;
             bottom: 20px;
             left: 20px;
@@ -24,7 +24,7 @@
             cursor: pointer;
             z-index: 1000;
             box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-        }
+        } */
 
         #stopFreeRunBtn  {
             position: fixed;
@@ -279,6 +279,8 @@
                             window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Starting track selection'}}));
                             enableTrackSelection();
 
+                        }else if (type === 'startFreeRun') {
+                            startFreeRun();
                         }else if (type === 'log') {
                             console.log('Log from WebView:', data.message);
                         }else {
@@ -548,7 +550,6 @@
         const list = document.getElementById('myEventsList');
         list.innerHTML = ''; // Clear existing list
         window.myEvents.forEach(event => {
-            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Inside handleEventList'}}));
             const li = document.createElement('li');
             li.textContent = event.name || 'Untitled Event';
             li.style.cursor = 'pointer';
@@ -584,6 +585,7 @@
             totalPausedTime = 0;
             totalRunTime = 0;
 
+            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'enterFreeRunMode'}}))
             window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Free run started'}}));
             console.log('Free run started at', new Date(freeRunStartTime).toLocaleString());
 
@@ -591,7 +593,7 @@
             updateRunTimer(); // Immediately update UI
             runTimerInterval = setInterval(updateRunTimer, 1000);
 
-            document.getElementById('startFreeRunBtn').style.display = 'none';
+            //document.getElementById('startFreeRunBtn').style.display = 'none';
             document.getElementById('pauseFreeRunBtn').style.display = 'inline';
             document.getElementById('stopFreeRunBtn').style.display = 'inline';
             document.getElementById('runStats').style.display = 'block';
@@ -654,7 +656,7 @@
             freeRunActive = false;
             //navigator.geolocation.clearWatch(freeRunWatchId);
 
-            document.getElementById('startFreeRunBtn').style.display = 'inline';
+            //document.getElementById('startFreeRunBtn').style.display = 'inline';
             document.getElementById('pauseFreeRunBtn').style.display = 'none';
             document.getElementById('stopFreeRunBtn').style.display = 'none';
             document.getElementById('runStats').style.display = 'none';
@@ -679,11 +681,13 @@
             // Set stats
             document.getElementById('summaryTime').textContent = document.getElementById('runTime').textContent;
             document.getElementById('summaryDistance').textContent = totalDistance.toFixed(1);
-            document.getElementById('summaryCalories').textContent = estimateCaloriesBurned(totalDistance);
+            //document.getElementById('summaryCalories').textContent = estimateCaloriesBurned(totalDistance);
+            // estimateCaloriesBurned is not even a function...
 
             const pace = totalDistance > 0 ? (totalRunTime / 60) / (totalDistance / 1000) : 0;
             document.getElementById('summaryPace').textContent = pace.toFixed(2);
 
+            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'leaveFreeRunMode'}}));
             // drawSummaryRoute();
         }
 
@@ -709,7 +713,7 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('startFreeRunBtn').onclick = startFreeRun;
+            //document.getElementById('startFreeRunBtn').onclick = startFreeRun;
             document.getElementById('pauseFreeRunBtn').onclick = pauseFreeRun;
             document.getElementById('stopFreeRunBtn').onclick = stopFreeRun;
         });
@@ -757,7 +761,7 @@
     </div>
 </div>
 <div id="freeRunControls" style="position: absolute; top: 10px; left: 10px; z-index: 1000;">
-  <button id="startFreeRunBtn">🏃</button>
+  <!-- <button id="startFreeRunBtn">🏃</button> -->
   <button id="pauseFreeRunBtn" style="display:none;">⏸️</button>
   <button id="stopFreeRunBtn" style="display:none;">⏹</button>
 </div>

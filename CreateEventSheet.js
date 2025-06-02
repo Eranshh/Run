@@ -4,7 +4,7 @@ import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { Picker } from '@react-native-picker/picker';
 
-const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, location, webRef, selectedTrack, tracks }, ref) => {
+const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, location, webRef, selectedTrack, tracks, setMode }, ref) => {
   const snapPoints = useMemo(() => ['25%', '75%'], []);
   
   const [formValues, setFormValues] = useState({ track: null });
@@ -37,6 +37,7 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
     webRef.current?.postMessage(JSON.stringify(
       { type: 'startTrackSelection' }
     ));
+    setMode("selectingTrack");
   };
   const handleSubmit = () => {
     if (!latitude || !longitude || !startTime) {
