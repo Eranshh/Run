@@ -226,73 +226,21 @@
                         }else if (type === "startSelectingLocation"){
                             // Start location selection
                             startLocationSelection();
-                        } else if (type === 'showEventTrack') {
-                            console.log('Showing track:', data.trackId);
-                            // Find the track in the existing tracks data
-                            const tracks = window.tracksData || [];
-                            const track = tracks.find(t => t.trackId === data.trackId);
-                            if (track) {
-                                // Clear any previously shown event track
-                                if (window.currentEventTrack) {
-                                    map.layers.remove(window.currentEventTrack);
-                                }
-                                // Draw the track with a distinctive style
-                                window.currentEventTrack = drawPath(track, {
-                                    strokeColor: '#FF4081',
-                                    strokeWidth: 4
-                                });
-
-                                // Get the first point of the track to center the map
-                                if (track.path && track.path.length > 0) {
-                                    const firstPoint = track.path[0];
-                                    const center = Array.isArray(firstPoint) ? 
-                                        [firstPoint[1], firstPoint[0]] : 
-                                        [firstPoint.longitude, firstPoint.latitude];
-                                    
-                                    // Set camera to the start of the track
-                                    map.setCamera({
-                                        center: center,
-                                        zoom: 15,
-                                        type: 'ease',
-                                        duration: 1000
-                                    });
-                                }
-                            } else {
-                                console.warn('Track not found:', data.trackId);
-                            }
-                        } else if (type === 'hideEventTrack') {
-                            console.log('Hiding event track');
-                            if (window.currentEventTrack) {
-                                map.layers.remove(window.currentEventTrack);
-                                window.currentEventTrack = null;
-                            }
-                        } else if (type === 'centerOnLocation') {
-                            console.log('Centering map on location:', data.location);
-                            if (data.location && !isNaN(data.location.latitude) && !isNaN(data.location.longitude)) {
-                                // Animate the map to center on the event location
-                                map.setCamera({
-                                    center: [data.location.longitude, data.location.latitude],
-                                    zoom: 15,
-                                    type: 'ease',
-                                    duration: 1000
-                                });
-                            } else {
-                                console.warn('Invalid location data:', data.location);
-                            }
                         } else if (type === 'tracks') {
                             console.log('Received track list:', data.data);
-                            const tracks = data.tracks || [];
-                            // Store tracks data for later use
-                            window.tracksData = tracks;
+                            const tracks  = data.tracks || [];
                             window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Received track list'}}));
                             window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: data.tracks}}));
-                            // Remove automatic track drawing
-                        } else if (type === 'storeTracks') {
-                            console.log('Storing track list:', data.tracks);
-                            // Only store the tracks without drawing them
-                            window.tracksData = data.tracks || [];
-                            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Stored track list'}}));
-                        } else if (type === 'startTrackSelection') {
+                            for (let i = 0; i < tracks.length; i++) {
+                                const { path, id } = tracks[i];
+                                if (!path || !Array.isArray(path) || path.length === 0) {
+                                    console.warn(`⚠️ Skipping track ${id} due to invalid path`);
+                                    continue;
+                                }
+                                // Draw the path on the map
+                                drawPath(tracks[i]);
+                            }
+                        }else if (type === 'startTrackSelection') {
                             console.log('Starting track selection');
                             window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Starting track selection'}}));
                             enableTrackSelection();
@@ -503,53 +451,62 @@
         });
     }
 
-    function drawPath(track, options = {}) {
-        if (!track || !track.path || !Array.isArray(track.path) || track.path.length === 0) {
-            console.warn('Invalid track data:', track);
-            return null;
-        }
+    function drawPath(track) {
+        let path = track.path || [];
+        //window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: path}}));
+        try{
 
-        // Normalize coordinates to [longitude, latitude] format
-        const coordinates = track.path.map(point => {
-            if (Array.isArray(point)) {
-                // If point is array [lat, lon], convert to [lon, lat]
-                return [point[1], point[0]];
-            } else if (point && typeof point === 'object') {
-                // If point is {latitude, longitude} object
-                return [point.longitude, point.latitude];
-            } else {
-                console.warn('Invalid point format:', point);
-                return null;
-            }
-        }).filter(point => point !== null); // Remove any invalid points
-
-        if (coordinates.length === 0) {
-            console.warn('No valid coordinates found in track:', track);
-            return null;
-        }
-
-        const defaultOptions = {
-            strokeColor: '#2E5BFF',
-            strokeWidth: 3
-        };
-        const layerOptions = { ...defaultOptions, ...options };
-        
-        try {
+            const marker = new atlas.HtmlMarker({
+                position: path[0],
+                text: 'T',
+                color: 'orange',
+                visible: false
+            });
+            marker.trackId = track.trackId; // <-- store the track ID here
+            trackMarkers.push(marker);
+            
+            map.markers.add(marker);
+            // Create a LineString geometry
+            const line = new atlas.data.LineString(path);
+            const feature = new atlas.data.Feature(line);
+            
+            // Create a DataSource and add the line feature to it
             const dataSource = new atlas.source.DataSource();
             map.sources.add(dataSource);
-
-            dataSource.add(new atlas.data.LineString(coordinates));
-
-            const layer = new atlas.layer.LineLayer(dataSource, null, {
-                strokeColor: layerOptions.strokeColor,
-                strokeWidth: layerOptions.strokeWidth
+            dataSource.add(feature);
+            
+            // Create a line layer and add it to the map
+            const lineLayer = new atlas.layer.LineLayer(dataSource, null, {
+                strokeColor: 'red',
+                strokeWidth: 3,
+                visible: false, // Initially hidden
             });
-
-            map.layers.add(layer);
-            return layer;
-        } catch (error) {
-            console.error('Error drawing path:', error.message);
-            return null;
+            trackLineLayers.push(lineLayer);
+            map.layers.add(lineLayer);
+            map.events.add('click', marker, () => {
+                // Toggle visibility of the line layer
+                const isVisible = lineLayer.getOptions().visible;
+                lineLayer.setOptions({ visible: !isVisible });
+                selectedTrackId = marker.trackId; // or marker.metadata.id
+                selectedTrackLon = marker.getOptions().position[0];
+                selectedTrackLat = marker.getOptions().position[1];
+                showSelectTrackButton();
+                //showCancelTrackSelectionButton();
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                    data: {
+                        action: 'log',
+                        message: `Toggled path visibility: ${!isVisible}`
+                    }
+                }));
+            });
+        }   catch (err) {
+            console.error("Failed to draw path:", err);
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+                data: {
+                    action: 'log',
+                    message: 'Error drawing path: ' + err.message
+                }
+            }));
         }
     }
 

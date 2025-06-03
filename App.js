@@ -35,161 +35,71 @@ export default function App() {
   useEffect(() => {
     const connectToSignalR = async () => {
       try {
-        console.log("Starting SignalR connection setup...");
-        
+        // STEP 1: Call backend negotiate endpoint to get URL + token
+        const res = await fetch("https://runfuncionapp.azurewebsites.net/api/negotiate");
+        if (!res.ok) throw new Error("Failed to fetch SignalR info");
+
+        const { url, accessToken } = await res.json();
+
+        // STEP 2: Use the returned info to connect
         const signalrConnection = new SignalR.HubConnectionBuilder()
-          .withUrl('https://runappsigr.service.signalr.net/client/?hub=mysignalrhub', {
-            accessTokenFactory: async () => {
-              try {
-                console.log("Calling negotiate endpoint...");
-                const response = await fetch('https://runfuncionapp.azurewebsites.net/api/negotiate');
-                console.log("Negotiate response status:", response.status);
-                const data = await response.json();
-                console.log("Access token requested:", data.accessToken);
-                return data.accessToken;
-              } catch (error) {
-                console.error("Error getting access token:", error);
-                throw error;
-              }
-            },
-            transport: SignalR.HttpTransportType.WebSockets,
-            skipNegotiation: false
+          .withUrl(url, {
+            accessTokenFactory: () => accessToken,
           })
-          .withAutomaticReconnect([0, 1000, 2000, 5000, 10000]) // More aggressive reconnection
+          .withAutomaticReconnect()
           .configureLogging(SignalR.LogLevel.Information)
-          .withKeepAliveInterval(10000) // Reduced to 10 seconds
-          .withServerTimeout(30000) // 30 second server timeout
           .build();
 
-        // Keep track of connection state with enhanced error handling
-        let isConnected = false;
-        let reconnectAttempt = 0;
-        const maxReconnectAttempts = 5;
-        let keepAliveInterval;
+        // STEP 3: Set up listeners
+        signalrConnection.on("addEvent", (message) => {
+        try {
+          console.log("Received message from SignalR:", message);
+          const event_data = typeof message === 'string' ? JSON.parse(message) : message;
 
-        signalrConnection.onreconnecting((error) => {
-          console.log("SignalR reconnecting...", error);
-          isConnected = false;
-          reconnectAttempt++;
-          clearInterval(keepAliveInterval);
-          
-          if (reconnectAttempt > maxReconnectAttempts) {
-            console.log("Max reconnection attempts reached, will try full restart");
-            signalrConnection.stop().then(() => {
-              reconnectAttempt = 0;
-              setTimeout(() => {
-                connectToSignalR(); // Restart connection process
-              }, 5000);
-            }).catch(err => {
-              console.error("Error stopping connection:", err);
-              // Try to restart anyway after a delay
-              setTimeout(() => {
-                connectToSignalR();
-              }, 5000);
-            });
+          console.log("Parsed event data:", event_data);
+          if (!event_data || !event_data.latitude || !event_data.longitude || !event_data.RowKey) {
+            console.warn("Invalid event data received:", event_data);
+            return;
           }
+          // Add event to the local event list
+          eventList.events.push({
+            latitude: event_data.latitude,
+            longitude: event_data.longitude,
+            runners: [],
+            id: event_data.RowKey,
+            name: event_data.name || "Unnamed Event",
+            trackId: event_data.trackId || null,
+            startTime: event_data.start_time || 0,
+            difficulty: event_data.difficulty || "begginer",
+            type: event_data.type || "free run",
+            host: event_data.trainerId || "unknown",
+            status: event_data.status || "open",
+          });
+
+          eventList.len = (eventList.len || 0) + 1;
+
+          // Send updated list to WebView
+          webViewRef.current.postMessage(JSON.stringify(eventList));
+        } catch (err) {
+          console.error("Error parsing SignalR event message:", err);
+        }
+      });
+
+
+        signalrConnection.onclose(() => {
+          console.log("SignalR connection closed.");
         });
 
-        signalrConnection.onreconnected((connectionId) => {
-          console.log("SignalR reconnected. Connection ID:", connectionId);
-          isConnected = true;
-          reconnectAttempt = 0;
-          startKeepAlive();
-          // Refresh data after reconnection
-          getAllOpenEvents();
-          getAllTracks();
-          getUsersEvents();
-        });
-
-        signalrConnection.onclose((error) => {
-          console.log("SignalR connection closed.", error ? JSON.stringify(error) : "No error details");
-          isConnected = false;
-          clearInterval(keepAliveInterval);
-          
-          if (reconnectAttempt <= maxReconnectAttempts) {
-            setTimeout(async () => {
-              try {
-                await signalrConnection.start();
-                console.log("SignalR connection restarted successfully");
-                isConnected = true;
-                startKeepAlive();
-              } catch (err) {
-                console.error("Failed to restart SignalR connection:", err);
-                reconnectAttempt++;
-                // Try to reconnect again if we haven't hit the limit
-                if (reconnectAttempt <= maxReconnectAttempts) {
-                  setTimeout(() => connectToSignalR(), 5000);
-                }
-              }
-            }, 5000);
-          }
-        });
-
-        // Enhanced keep-alive mechanism with better error handling
-        const startKeepAlive = () => {
-          if (keepAliveInterval) clearInterval(keepAliveInterval);
-          keepAliveInterval = setInterval(async () => {
-            if (isConnected) {
-              try {
-                await signalrConnection.invoke("KeepAlive");
-                console.log("Keep-alive ping sent successfully");
-              } catch (error) {
-                console.warn("Keep-alive ping failed:", error);
-                // If ping fails and we're supposedly connected, try to reconnect
-                if (signalrConnection.state === SignalR.HubConnectionState.Connected) {
-                  try {
-                    await signalrConnection.stop();
-                    await signalrConnection.start();
-                    console.log("Connection restarted after failed keep-alive");
-                  } catch (err) {
-                    console.error("Failed to restart connection after keep-alive failure:", err);
-                    // If restart fails, trigger a full reconnection
-                    reconnectAttempt = 0;
-                    setTimeout(() => connectToSignalR(), 5000);
-                  }
-                }
-              }
-            }
-          }, 10000);
-        };
-
-        // Start the connection with retry logic
-        const startConnection = async (retryCount = 0) => {
-          try {
-            await signalrConnection.start();
-            console.log("SignalR connected successfully");
-            isConnected = true;
-            reconnectAttempt = 0;
-            startKeepAlive();
-            setConnection(signalrConnection);
-          } catch (err) {
-            console.error(`Connection attempt ${retryCount + 1} failed:`, err);
-            if (retryCount < maxReconnectAttempts) {
-              setTimeout(() => startConnection(retryCount + 1), 5000);
-            } else {
-              console.error("Failed to establish initial connection after max retries");
-            }
-          }
-        };
-
-        await startConnection();
-
+        await signalrConnection.start();
+        console.log("SignalR connected.");
+        setConnection(signalrConnection);
       } catch (error) {
         console.error("SignalR setup failed:", error);
-        setTimeout(() => {
-          connectToSignalR();
-        }, 5000);
       }
     };
 
     connectToSignalR();
 
-    // Cleanup on unmount
-    return () => {
-      if (connection) {
-        connection.stop();
-      }
-    };
   }, []);
 
   useEffect(() => {
@@ -382,50 +292,24 @@ const getAllTracks = async () => {
       const response = await fetch(`https://runfuncionapp.azurewebsites.net/api/getAllTracks`);
       const data = await response.json();
       console.log('Got Tracks:', data);
-      
-      // Normalize track data to ensure consistent format
-      const normalizedTracks = data.map(track => {
-        if (!track.path || !Array.isArray(track.path)) {
-          console.warn('Invalid track data:', track);
-          return null;
-        }
-        
-        // Normalize path to array of {latitude, longitude} objects
-        const normalizedPath = track.path.map(point => {
-          if (Array.isArray(point)) {
-            return {
-              latitude: point[0],
-              longitude: point[1]
-            };
-          } else if (point && typeof point === 'object' && 'latitude' in point && 'longitude' in point) {
-            return point;
-          } else {
-            console.warn('Invalid point format:', point);
-            return null;
-          }
-        }).filter(point => point !== null);
-
-        return {
-          trackId: track.trackId, // Ensure trackId is preserved
-          path: normalizedPath
-        };
-      }).filter(track => track !== null && track.path.length > 0);
-
-      console.log('Normalized tracks:', normalizedTracks);
-      const trackIds = normalizedTracks.map(track => track.trackId);
-      setTracks(trackIds);
-      
-      // Only send track data to WebView, without drawing them
-      webViewRef.current.postMessage(JSON.stringify({
-        'type': "storeTracks", // Changed from "tracks" to "storeTracks"
-        'tracks': normalizedTracks
-      }));
+      console.log('first point:', data[0].path[0]);
+      const trackIds = data.map(track => track.trackId);
+      setTracks(trackIds); // Now just a list of strings
+      webViewRef.current.postMessage(JSON.stringify({'type': "tracks", 'tracks': data}));
+      //setTracks(data); // Store them in state
+      // eventList.events = data;
+      // eventList.events = data.map((event) => ({
+      //   latitude: event.latitude,
+      //   longitude: event.longitude,
+      //   id: event.eventId,
+      // }));
+      // webViewRef.current.postMessage(JSON.stringify(eventList));
       
     } catch (error) {
       console.error('Error calling Azure Function:', error);
       console.log('Error occurred');
     }
-};
+  };
 
   const getEventUsersForDisplay = async (id, eventObject) => {
     try {
@@ -441,18 +325,6 @@ const getAllTracks = async () => {
       const data = await response.json();
       eventObject["usersList"] = data;
       setSelectedEvent(eventObject);
-      
-      // Center map on event location
-      if (webViewRef && webViewRef.current) {
-        webViewRef.current.postMessage(JSON.stringify({
-          type: 'centerOnLocation',
-          location: {
-            latitude: eventObject.latitude,
-            longitude: eventObject.longitude
-          }
-        }));
-      }
-      
       console.log('Got users:', data);
     } catch (error) {
       console.error('Error calling Azure Function:', error);
@@ -593,7 +465,6 @@ const getAllTracks = async () => {
               deleteEvent={deleteEvent}
               eventObject={selectedEvent}
               userId={"user123"}
-              webRef={webViewRef}
               onClose={() => setIsEventDisplayVisible(false)}
             />
           )}
