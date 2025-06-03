@@ -3,7 +3,7 @@ import React, { useMemo, useState,useEffect } from 'react';
 import { View, FlatList, Text, Button, StyleSheet } from 'react-native';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 
-const CreateEventDisplay = React.forwardRef(({ eventObject, joinEvent, deleteEvent, userId }, ref) => {
+const CreateEventDisplay = React.forwardRef(({ eventObject, joinEvent, deleteEvent, userId, webRef }, ref) => {
   const snapPoints = useMemo(() => ['25%', '50%'], []);
 
   const [eventTitle, setTitle] = useState('Some Event');
@@ -14,6 +14,8 @@ const CreateEventDisplay = React.forwardRef(({ eventObject, joinEvent, deleteEve
   const [difficulty, setDifficulty] = useState(null);
   const [startTime, setStartTime] = useState(null);
   const [users, setUsers] = useState([]);
+  const [trackId, setTrackId] = useState(null);
+  const [isTrackVisible, setIsTrackVisible] = useState(false);
 
   useEffect(() => {
     if (eventObject) {
@@ -25,6 +27,7 @@ const CreateEventDisplay = React.forwardRef(({ eventObject, joinEvent, deleteEve
       if (eventObject.difficulty) setDifficulty(eventObject.difficulty);
       if (eventObject.startTime) setStartTime(eventObject.startTime);
       if (eventObject.usersList) setUsers(eventObject.usersList);
+      if (eventObject.trackId) setTrackId(eventObject.trackId);
     }
   }, [eventObject]);
 
@@ -37,46 +40,102 @@ const CreateEventDisplay = React.forwardRef(({ eventObject, joinEvent, deleteEve
     ref.current?.close();
   }
 
+  const handleShowTrack = () => {
+    if (webRef && webRef.current && trackId) {
+      // Minimize the bottom sheet
+      ref.current?.snapToIndex(0);
+      
+      // Show the track on the map
+      webRef.current.postMessage(JSON.stringify({
+        type: 'showEventTrack',
+        trackId: trackId
+      }));
+      setIsTrackVisible(true);
+    }
+  }
+
+  const handleHideTrack = () => {
+    if (webRef && webRef.current) {
+      // Hide the track
+      webRef.current.postMessage(JSON.stringify({
+        type: 'hideEventTrack'
+      }));
+      // Expand the bottom sheet to show full event details
+      ref.current?.snapToIndex(1);
+      setIsTrackVisible(false);
+    }
+  }
+
   return (
     <BottomSheet
         ref={ref}
         index={0}
         snapPoints={snapPoints}
-        enablePanDownToClose={true} // This enables swipe-down to close
+        enablePanDownToClose={true}
         onClose={() => {
-          // Optional: reset fields on close
+          // Reset fields and hide track on close
           setTitle('Some Event');
+          setIsTrackVisible(false);
+          if (webRef && webRef.current) {
+            webRef.current.postMessage(JSON.stringify({
+              type: 'hideEventTrack'
+            }));
+          }
         }}
       >
       <BottomSheetView style={styles.container}>
         <Text style={styles.title}>{eventTitle}</Text>
 
-        <Text style={styles.label}>Status: <Text style={styles.textValue}>{status}</Text></Text>
-        <Text style={styles.label}>Type: <Text style={styles.textValue}>{type}</Text></Text>
-        <Text style={styles.label}>Difficulty: <Text style={styles.textValue}>{difficulty}</Text></Text>
-        <Text style={styles.label}>Start Time: <Text style={styles.textValue}>{startTime}</Text></Text>
-        <Text style={styles.label}>Host: <Text style={styles.textValue}>{host}</Text></Text>
+        {!isTrackVisible ? (
+          <>
+            <Text style={styles.label}>Status: <Text style={styles.textValue}>{status}</Text></Text>
+            <Text style={styles.label}>Type: <Text style={styles.textValue}>{type}</Text></Text>
+            <Text style={styles.label}>Difficulty: <Text style={styles.textValue}>{difficulty}</Text></Text>
+            <Text style={styles.label}>Start Time: <Text style={styles.textValue}>{startTime}</Text></Text>
+            <Text style={styles.label}>Host: <Text style={styles.textValue}>{host}</Text></Text>
 
-        <View style={styles.userList}>
-          <Text style={styles.label}>Registered Users:</Text>
-          <FlatList
-            data={users}
-            renderItem={({item}) => <Text style={styles.userItem}>{item.FirstName} {item.LastName}</Text>}
-          />
-        </View>
+            <View style={styles.userList}>
+              <Text style={styles.label}>Registered Users:</Text>
+              <FlatList
+                data={users}
+                renderItem={({item}) => <Text style={styles.userItem}>{item.FirstName} {item.LastName}</Text>}
+              />
+            </View>
+          </>
+        ) : (
+          <Text style={styles.label}>Track is currently visible on the map</Text>
+        )}
 
         <View style={styles.buttonContainer}>
-          <Button
-            title="Join"
-            onPress={handleJoin}
-          />
-          <Button
-            title="Delete"
-            onPress={handleDelete}
-          />
+          {!isTrackVisible && (
+            <>
+              <Button
+                title="Join"
+                onPress={handleJoin}
+              />
+              {trackId && (
+                <Button
+                  title="Show Track"
+                  onPress={handleShowTrack}
+                  color="#4CAF50"
+                />
+              )}
+              <Button
+                title="Delete"
+                onPress={handleDelete}
+              />
+            </>
+          )}
+          {isTrackVisible && trackId && (
+            <Button
+              title="Return to Event Details"
+              onPress={handleHideTrack}
+              color="#2196F3"
+            />
+          )}
           <Button
               title="Close"
-              onPress={() =>ref.current?.close()}
+              onPress={() => ref.current?.close()}
           />
         </View>
       </BottomSheetView>
