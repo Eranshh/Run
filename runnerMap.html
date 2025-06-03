@@ -657,8 +657,7 @@
             // Set stats
             document.getElementById('summaryTime').textContent = document.getElementById('runTime').textContent;
             document.getElementById('summaryDistance').textContent = totalDistance.toFixed(1);
-            //document.getElementById('summaryCalories').textContent = estimateCaloriesBurned(totalDistance);
-            // estimateCaloriesBurned is not even a function...
+            document.getElementById('summaryCalories').textContent = estimateCalories(totalDistance);
 
             const pace = totalDistance > 0 ? (totalRunTime / 60) / (totalDistance / 1000) : 0;
             document.getElementById('summaryPace').textContent = pace.toFixed(2);
