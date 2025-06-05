@@ -220,6 +220,7 @@ export default function App() {
       });
       const text = await response.text(); // Get raw response
       console.log('Raw response:', text);
+      getUsersEvents();
       // const data = await response.json();
       // console.log('User joined event:', data);
       // eventList.events = eventList.events.filter(event => event.id !== message.data.eventId);
@@ -344,6 +345,9 @@ const getAllTracks = async () => {
   };
   const handleSubmitEvent = (event) => {
     createEvent(event);
+    setTimeout(getUsersEvents,
+        1000
+    ); // wait for the event to be created then get the users events
     sheetRef.current?.snapToIndex(-1);
     setIsSheetVisible(false); // hide sheet
   };
