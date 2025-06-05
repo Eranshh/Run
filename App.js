@@ -14,13 +14,13 @@ export default function App() {
   const [userType, setUserType] = useState(null);
   const [connection, setConnection] = useState(null);
   const [isSheetVisible, setIsSheetVisible] = useState(false);
-  const [isSelectingLocation, setIsSelectingLocation] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [tracks, setTracks] = useState([]);
   const [selectedTrack, setSelectedTrack] = useState(null);
   const [isEventDisplayVisible, setIsEventDisplayVisible] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [mapReady, setMapReady] = useState(false);
+  const [mode, setMode] = useState("mainMap");
 
   const webViewRef = useRef(null);
   const eventDisplayRef = useRef(null);
@@ -116,8 +116,8 @@ export default function App() {
       watcher = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.High,
-          timeInterval: 3000,
-          distanceInterval: 5,
+          timeInterval: 2000,
+          distanceInterval: 1,
         },
         (location) => {
           // Send updated location to the WebView
@@ -334,7 +334,7 @@ const getAllTracks = async () => {
 
   const handleSelectLocation = () => {
     console.log("Entering location select mode");
-    setIsSelectingLocation(true);
+    setMode("selectingLocation");
     webViewRef.current.postMessage(JSON.stringify({ type: 'startSelectingLocation' }));
   };
 
@@ -351,6 +351,10 @@ const getAllTracks = async () => {
   const openEventDisplay = () => {
     eventDisplayRef.current?.snapToIndex(1);
     setIsEventDisplayVisible(true);
+  }
+
+  function startFreeRun() {
+    webViewRef.current.postMessage(JSON.stringify({ type: 'startFreeRun' }));
   }
 
   // Listen for messages from the map:
@@ -376,7 +380,7 @@ const getAllTracks = async () => {
       }else if (message.data.action === "confirmLocation") {
         console.log("Location confirmed:", message.data.location);
         setSelectedLocation(message.data.location);
-        setIsSelectingLocation(false);
+        setMode("mainMap");
         // Reopen sheet
         sheetRef.current?.snapToIndex(1);
       } else if (message.data.action === 'trackSelected') {
@@ -385,11 +389,12 @@ const getAllTracks = async () => {
         setSelectedTrack(selectedTrackId);
         setSelectedLocation(message.data.location);
         openEventSheet();
+        setMode("mainMap");
       } else if (message.data.action === 'cancelTrackSelection') {
         console.log('Canceling track selection');
         sheetRef.current?.snapToIndex(0);
         setIsSheetVisible(false); // hide sheet
-
+        setMode("mainMap");
       } else if (message.data.action === "log"){
         //console.log("log message");
         console.log(message.data.message);
@@ -402,6 +407,10 @@ const getAllTracks = async () => {
       } else if (message.data.action === "openEventDisplay") {
         getEventUsersForDisplay(message.data.eventObject.id, message.data.eventObject);
         openEventDisplay();
+      } else if (message.data.action === "enterFreeRunMode") {
+        setMode("freeRun")
+      } else if (message.data.action === "leaveFreeRunMode") {
+        setMode("mainMap");
       }
       
       else {
@@ -441,9 +450,14 @@ const getAllTracks = async () => {
           style={{ flex: 1 }}
           onMessage={handleWebViewMessage}
           />
-          {!isSelectingLocation && (
-            <TouchableOpacity style={styles.fab} onPress={openEventSheet}>
+          {mode === "mainMap" && (
+            <TouchableOpacity id="createEventBtn" style={styles.fab} onPress={openEventSheet}>
               <Text style={styles.fabText}>+</Text>
+            </TouchableOpacity>
+          )}
+          {mode === "mainMap" && (
+            <TouchableOpacity id="startFreeRunBtn" style={styles.freeRunBtn} onPress={startFreeRun}>
+              <Text style={styles.fabText}>🏃</Text>
             </TouchableOpacity>
           )}
           {isSheetVisible && (
@@ -455,6 +469,7 @@ const getAllTracks = async () => {
               webRef={webViewRef}
               selectedTrack={selectedTrack}
               tracks={tracks}
+              setMode={setMode}
               onClose={() => setIsSheetVisible(false)}
             />
           )}
@@ -508,4 +523,21 @@ const styles = StyleSheet.create({
     fontSize: 32,
     lineHeight: 32,
   },
+  freeRunBtn: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#0078D4',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 5,
+    zIndex: 1000,
+  }
 });
