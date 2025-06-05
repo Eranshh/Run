@@ -211,6 +211,7 @@
 
                             console.log('Received users events:', usersEvents);
                             window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Received users events:' + usersEvents}}));
+                            window.myEvents = []; // Reset my events
                             usersEvents.forEach(event => {
                                 window.myEvents.push({ id: event.id, name: event.name, latitude: event.latitude, longitude: event.longitude });
                             });
