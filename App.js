@@ -10,6 +10,46 @@ import CreateEventDisplay from './CreateEventDisplay';
 import { get } from 'react-native/Libraries/TurboModule/TurboModuleRegistry';
 import { ConsoleLogger } from '@microsoft/signalr/dist/esm/Utils';
 
+const API_TIMEOUT = 15000; // 15 seconds
+const MAX_RETRIES = 3;
+
+const fetchWithRetry = async (url, options = {}) => {
+  let lastError;
+  
+  for (let i = 0; i < MAX_RETRIES; i++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+      
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      lastError = error;
+      if (error.name === 'AbortError') {
+        console.log(`Request timeout, attempt ${i + 1} of ${MAX_RETRIES}`);
+      } else {
+        console.log(`Request failed, attempt ${i + 1} of ${MAX_RETRIES}:`, error);
+      }
+      if (i < MAX_RETRIES - 1) {
+        // Wait before retrying (exponential backoff)
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
+      }
+    }
+  }
+  
+  throw lastError;
+};
+
 export default function App() {
   const [userType, setUserType] = useState(null);
   const [connection, setConnection] = useState(null);
@@ -45,8 +85,9 @@ export default function App() {
         const signalrConnection = new SignalR.HubConnectionBuilder()
           .withUrl(url, {
             accessTokenFactory: () => accessToken,
+            timeout: 30000, // 30 second timeout
           })
-          .withAutomaticReconnect()
+          .withAutomaticReconnect([0, 2000, 5000, 10000, 30000]) // Retry after 0s, 2s, 5s, 10s, then every 30s
           .configureLogging(SignalR.LogLevel.Information)
           .build();
 
@@ -85,6 +126,19 @@ export default function App() {
         }
       });
 
+        // Add reconnecting and reconnected handlers
+        signalrConnection.onreconnecting((error) => {
+          console.log("SignalR reconnecting:", error);
+          // Optionally show a reconnecting UI state
+        });
+
+        signalrConnection.onreconnected((connectionId) => {
+          console.log("SignalR reconnected:", connectionId);
+          // Refresh data after reconnection
+          getAllOpenEvents();
+          getAllTracks();
+          getUsersEvents();
+        });
 
         signalrConnection.onclose(() => {
           console.log("SignalR connection closed.");
@@ -144,18 +198,81 @@ export default function App() {
   const createEvent = async (event) => {
     try {
       console.log("Creating event with data:", event);
-      const response = await fetch('https://runfuncionapp.azurewebsites.net/api/createEvent',{
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        //name: 'Expo User', // Send any data your function expects
-        //TODO: add event name
-        timestamp: new Date().toISOString(),
+      const data = await fetchWithRetry('https://runfuncionapp.azurewebsites.net/api/createEvent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          timestamp: new Date().toISOString(),
+          latitude: event.latitude,
+          longitude: event.longitude,
+          trainerId: 'user123',
+          name: event.name,
+          trackId: event.trackId,
+          startTime: event.start_time,
+          difficulty: event.difficulty,
+          type: event.type,
+          host: event.trainerId,
+          status: event.status,
+        }),
+      });
+      console.log('Event created:', data);
+    } catch (error) {
+      console.error('Error creating event:', error);
+      // Handle error appropriately
+    }
+  };
+
+  const deleteEvent = async (id) => {
+    try {
+      console.log("deleting event: ", id);
+      const data = await fetchWithRetry('https://runfuncionapp.azurewebsites.net/api/deleteEvent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          eventId: id
+        }),
+      });
+      console.log('Event deleted successfully:', data);
+      eventList.events = eventList.events.filter(event => event.id !== data.eventId);
+      webViewRef.current.postMessage(JSON.stringify(eventList));
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      // Handle error appropriately
+    }
+  };
+
+  const joinEvent = async (event_id, user_id) => {
+    try {
+      const data = await fetchWithRetry('https://runfuncionapp.azurewebsites.net/api/joinEvent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          eventId: event_id,
+          userId: user_id
+        }),
+      });
+      console.log('User joined event:', data);
+      getUsersEvents();
+    } catch (error) {
+      console.error('Error joining event:', error);
+      // Handle error appropriately
+    }
+  };
+
+  const getAllOpenEvents = async () => {
+    try {
+      const data = await fetchWithRetry('https://runfuncionapp.azurewebsites.net/api/getAllOpenEvents');
+      console.log('Got Events:', data);
+      eventList.events = data.map((event) => ({
         latitude: event.latitude,
         longitude: event.longitude,
-        trainerId: 'user123', // Replace with actual user ID
+        id: event.eventId,
         name: event.name,
         trackId: event.trackId,
         startTime: event.start_time,
@@ -163,109 +280,20 @@ export default function App() {
         type: event.type,
         host: event.trainerId,
         status: event.status,
-      }),
-      });
-      const data = await response.json();
-      console.log('Event created:', data);
-      
-      // signalr will handle this
-      // eventList.events.push({latitude: data.latitude, longitude: data.longitude, runners: [], id: eventList.len});
-      // eventList.len++;
-      // webViewRef.current.postMessage(JSON.stringify(eventList));
-      // eventList.events.push({latitude: data.latitude, longitude: data.longitude, runners: [], id: eventList.len});
-    } catch (error) {
-      console.error('Error calling Azure Function:', error);
-      console.log('Error occurred');
-    }
-  };
-
-  const deleteEvent = async (id) => {
-    try {
-      console.log("deleting event: ", id);
-      const response = await fetch('https://runfuncionapp.azurewebsites.net/api/deleteEvent',{
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        //name: 'Expo User', // Send any data your function expects
-        eventId: id
-      }),
-      });
-      // const text = await response.text(); // Get raw response
-      // console.log('Raw response:', text);
-      const data = await response.json();
-      console.log('Event deleted successfuly:', data);
-      eventList.events = eventList.events.filter(event => event.id !== data.eventId);
+      }));
+      console.log('Event list:', eventList);
       webViewRef.current.postMessage(JSON.stringify(eventList));
-
     } catch (error) {
-      console.error('Error calling Azure Function:', error);
-      console.log('Error occurred');
+      console.error('Error fetching events:', error);
+      // Handle error appropriately
     }
   };
-
-  const joinEvent = async (event_id, user_id) => {
-    try {
-      const response = await fetch('https://runfuncionapp.azurewebsites.net/api/joinEvent',{
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-
-        eventId: event_id,
-        userId: user_id
-      }),
-      });
-      const text = await response.text(); // Get raw response
-      console.log('Raw response:', text);
-      getUsersEvents();
-      // const data = await response.json();
-      // console.log('User joined event:', data);
-      // eventList.events = eventList.events.filter(event => event.id !== message.data.eventId);
-      // webViewRef.current.postMessage(JSON.stringify(eventList));
-      
-    } catch (error) {
-      console.error('Error calling Azure Function:', error);
-      console.log('Error occurred');
-    }
-  };
-
-  const getAllOpenEvents = async () => {
-  try {
-    const response = await fetch('https://runfuncionapp.azurewebsites.net/api/getAllOpenEvents');
-    const data = await response.json();
-    console.log('Got Events:', data);
-    // eventList.events = data;
-    eventList.events = data.map((event) => ({
-      latitude: event.latitude,
-      longitude: event.longitude,
-      id: event.eventId,
-      name: event.name,
-      trackId: event.trackId,
-      startTime: event.start_time,
-      difficulty: event.difficulty,
-      type: event.type,
-      host: event.trainerId,
-      status: event.status,
-    }));
-    console.log('Event list:', eventList);
-    webViewRef.current.postMessage(JSON.stringify(eventList));
-    
-  } catch (error) {
-    console.error('Error calling Azure Function:', error);
-    console.log('Error occurred');
-  }
-};
 
  const getUsersEvents = async () => {
   try {
-    const userId = "user123"; // Replace with the actual user ID
-    const response = await fetch(`https://runfuncionapp.azurewebsites.net/api/getUsersEvents?userId=${encodeURIComponent(userId)}`);
-    const data = await response.json();
+    const userId = "user123";
+    const data = await fetchWithRetry(`https://runfuncionapp.azurewebsites.net/api/getUsersEvents?userId=${encodeURIComponent(userId)}`);
     console.log('Got Events:', data);
-    // eventList.events = data;
     let myEvents = data.map((event) => ({
       latitude: event.latitude,
       longitude: event.longitude,
@@ -282,54 +310,42 @@ export default function App() {
     webViewRef.current.postMessage(JSON.stringify(myEventsList));
     
   } catch (error) {
-    console.error('Error calling Azure Function:', error);
-    console.log('Error occurred');
+    console.error('Error fetching user events:', error);
+    // Handle error appropriately
   }
 };
 
 const getAllTracks = async () => {
     try {
-      const userId = "user123"; // Replace with the actual user ID
-      const response = await fetch(`https://runfuncionapp.azurewebsites.net/api/getAllTracks`);
-      const data = await response.json();
+      const data = await fetchWithRetry('https://runfuncionapp.azurewebsites.net/api/getAllTracks');
       console.log('Got Tracks:', data);
       console.log('first point:', data[0].path[0]);
       const trackIds = data.map(track => track.trackId);
-      setTracks(trackIds); // Now just a list of strings
+      setTracks(trackIds);
       webViewRef.current.postMessage(JSON.stringify({'type': "tracks", 'tracks': data}));
-      //setTracks(data); // Store them in state
-      // eventList.events = data;
-      // eventList.events = data.map((event) => ({
-      //   latitude: event.latitude,
-      //   longitude: event.longitude,
-      //   id: event.eventId,
-      // }));
-      // webViewRef.current.postMessage(JSON.stringify(eventList));
-      
     } catch (error) {
-      console.error('Error calling Azure Function:', error);
-      console.log('Error occurred');
+      console.error('Error fetching tracks:', error);
+      // Handle error appropriately
     }
   };
 
   const getEventUsersForDisplay = async (id, eventObject) => {
     try {
-      const response = await fetch(`https://runfuncionapp.azurewebsites.net/api/getEventRegisteredUsers`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        eventId: id,
-      }),
+      const data = await fetchWithRetry('https://runfuncionapp.azurewebsites.net/api/getEventRegisteredUsers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          eventId: id,
+        }),
       });
-      const data = await response.json();
       eventObject["usersList"] = data;
       setSelectedEvent(eventObject);
       console.log('Got users:', data);
     } catch (error) {
-      console.error('Error calling Azure Function:', error);
-      console.log('Error occurred');
+      console.error('Error fetching event users:', error);
+      // Handle error appropriately
     }
   };
 
