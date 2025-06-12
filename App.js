@@ -5,10 +5,16 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
 import * as SignalR from '@microsoft/signalr';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import CreateEventSheet from './CreateEventSheet';
 import CreateEventDisplay from './CreateEventDisplay';
+import LoginScreen from './LoginScreen';
+import RegisterScreen from './RegisterScreen';
 import { get } from 'react-native/Libraries/TurboModule/TurboModuleRegistry';
 import { ConsoleLogger } from '@microsoft/signalr/dist/esm/Utils';
+
+const Stack = createNativeStackNavigator();
 
 const API_TIMEOUT = 15000; // 15 seconds
 const MAX_RETRIES = 3;
@@ -50,7 +56,7 @@ const fetchWithRetry = async (url, options = {}) => {
   throw lastError;
 };
 
-export default function App() {
+function MainScreen() {
   const [userType, setUserType] = useState(null);
   const [connection, setConnection] = useState(null);
   const [isSheetVisible, setIsSheetVisible] = useState(false);
@@ -442,70 +448,54 @@ const getAllTracks = async () => {
   };
 
 
-  if (userType === null) {
-    return (
-       <GestureHandlerRootView style={{ flex: 1 }}>
-        <View style={styles.container}>
-          <Text style={styles.text}>Choose user type:</Text>
-          <StatusBar style="auto" />
-
-          <View style={styles.buttonContainer}>
-            <Button title="Runner" onPress={() => setUserType('runner')}/>
-            <Text>       </Text>
-            <Button title="Trainer" onPress={() => setUserType('trainer')}/>
-          </View>
-        </View>
-      </GestureHandlerRootView>
-    );
-  } 
-    return (
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <View style={{flex: 1}}>
-          <WebView
-          ref={webViewRef}
-          originWhitelist={['*']}
-          source={require('./runnerMap.html')}
-          javaScriptEnabled={true}
-          domStorageEnabled={true}
-          style={{ flex: 1 }}
-          onMessage={handleWebViewMessage}
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <View style={{flex: 1}}>
+        <WebView
+        ref={webViewRef}
+        originWhitelist={['*']}
+        source={require('./runnerMap.html')}
+        javaScriptEnabled={true}
+        domStorageEnabled={true}
+        style={{ flex: 1 }}
+        onMessage={handleWebViewMessage}
+        />
+        {mode === "mainMap" && (
+          <TouchableOpacity id="createEventBtn" style={styles.fab} onPress={openEventSheet}>
+            <Text style={styles.fabText}>+</Text>
+          </TouchableOpacity>
+        )}
+        {mode === "mainMap" && (
+          <TouchableOpacity id="startFreeRunBtn" style={styles.freeRunBtn} onPress={startFreeRun}>
+            <Text style={styles.fabText}>🏃</Text>
+          </TouchableOpacity>
+        )}
+        {isSheetVisible && (
+          <CreateEventSheet
+            ref={sheetRef}
+            onSubmit={handleSubmitEvent}
+            onSelectLocation={handleSelectLocation}
+            location={selectedLocation}
+            webRef={webViewRef}
+            selectedTrack={selectedTrack}
+            tracks={tracks}
+            setMode={setMode}
+            onClose={() => setIsSheetVisible(false)}
           />
-          {mode === "mainMap" && (
-            <TouchableOpacity id="createEventBtn" style={styles.fab} onPress={openEventSheet}>
-              <Text style={styles.fabText}>+</Text>
-            </TouchableOpacity>
-          )}
-          {mode === "mainMap" && (
-            <TouchableOpacity id="startFreeRunBtn" style={styles.freeRunBtn} onPress={startFreeRun}>
-              <Text style={styles.fabText}>🏃</Text>
-            </TouchableOpacity>
-          )}
-          {isSheetVisible && (
-            <CreateEventSheet
-              ref={sheetRef}
-              onSubmit={handleSubmitEvent}
-              onSelectLocation={handleSelectLocation}
-              location={selectedLocation}
-              webRef={webViewRef}
-              selectedTrack={selectedTrack}
-              tracks={tracks}
-              setMode={setMode}
-              onClose={() => setIsSheetVisible(false)}
-            />
-          )}
-          {isEventDisplayVisible && (
-            <CreateEventDisplay
-              ref={eventDisplayRef}
-              joinEvent={joinEvent}
-              deleteEvent={deleteEvent}
-              eventObject={selectedEvent}
-              userId={"user123"}
-              onClose={() => setIsEventDisplayVisible(false)}
-            />
-          )}
-        </View>
-      </GestureHandlerRootView>
-    )
+        )}
+        {isEventDisplayVisible && (
+          <CreateEventDisplay
+            ref={eventDisplayRef}
+            joinEvent={joinEvent}
+            deleteEvent={deleteEvent}
+            eventObject={selectedEvent}
+            userId={"user123"}
+            onClose={() => setIsEventDisplayVisible(false)}
+          />
+        )}
+      </View>
+    </GestureHandlerRootView>
+  )
 }
 
 const styles = StyleSheet.create({
@@ -561,3 +551,27 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   }
 });
+
+export default function App() {
+  return (
+    <NavigationContainer>
+      <Stack.Navigator initialRouteName="Login">
+        <Stack.Screen 
+          name="Login" 
+          component={LoginScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="Register" 
+          component={RegisterScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="Main" 
+          component={MainScreen}
+          options={{ headerShown: false }}
+        />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
