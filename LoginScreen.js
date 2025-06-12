@@ -9,6 +9,7 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  Switch,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -16,6 +17,7 @@ export default function LoginScreen({ navigation }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
 
   const handleLogin = async () => {
     if (!username || !password) {
@@ -42,12 +44,15 @@ export default function LoginScreen({ navigation }) {
         throw new Error(data.error || 'Login failed');
       }
 
-      // Store the token and username
-      await AsyncStorage.setItem('userToken', data.token);
-      await AsyncStorage.setItem('username', data.username);
+      // Store the token, username, and userId if remember me is checked
+      if (rememberMe) {
+        await AsyncStorage.setItem('userToken', data.token);
+        await AsyncStorage.setItem('username', data.username);
+        await AsyncStorage.setItem('userId', data.user_id);
+      }
 
       // Navigate to main app screen
-      navigation.replace('Main');
+      navigation.replace('mainMap');
     } catch (error) {
       Alert.alert('Error', error.message || 'Failed to login. Please check your credentials.');
     } finally {
@@ -80,6 +85,17 @@ export default function LoginScreen({ navigation }) {
           secureTextEntry
           editable={!isLoading}
         />
+
+        <View style={styles.rememberMeContainer}>
+          <Switch
+            value={rememberMe}
+            onValueChange={setRememberMe}
+            trackColor={{ false: '#767577', true: '#81b0ff' }}
+            thumbColor={rememberMe ? '#007AFF' : '#f4f3f4'}
+            disabled={isLoading}
+          />
+          <Text style={styles.rememberMeText}>Remember Me</Text>
+        </View>
         
         <TouchableOpacity 
           style={[styles.button, isLoading && styles.buttonDisabled]} 
@@ -129,6 +145,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     marginBottom: 15,
     fontSize: 16,
+  },
+  rememberMeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  rememberMeText: {
+    marginLeft: 8,
+    fontSize: 16,
+    color: '#333',
   },
   button: {
     backgroundColor: '#007AFF',

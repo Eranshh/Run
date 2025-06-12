@@ -136,11 +136,145 @@
             margin-bottom: 5px;
             font-size: 14px;
         }
+
+        .user-menu {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+        }
+
+        .user-menu-button {
+            background: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .menu-arrow {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .user-menu-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            margin-top: 5px;
+            min-width: 120px;
+        }
+
+        .user-menu-dropdown.show {
+            display: block;
+        }
+
+        .menu-item {
+            display: block;
+            width: 100%;
+            padding: 8px 12px;
+            border: none;
+            background: none;
+            text-align: left;
+            cursor: pointer;
+        }
+
+        .menu-item:hover {
+            background: #f5f5f5;
+        }
+
+        .logout-button {
+            color: #ff4444;
+        }
+
+        .logout-button:hover {
+            background: #fff0f0 !important;
+        }
+
+        .user-card {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            padding: 10px;
+            z-index: 1000;
+        }
+
+        .user-menu {
+            position: relative;
+        }
+
+        .user-menu-button {
+            background: none;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            width: 100%;
+            text-align: left;
+        }
+
+        .menu-arrow {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .user-menu-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            margin-top: 5px;
+        }
+
+        .user-menu-dropdown.show {
+            display: block;
+        }
+
+        .menu-item {
+            display: block;
+            width: 100%;
+            padding: 8px 12px;
+            border: none;
+            background: none;
+            text-align: left;
+            cursor: pointer;
+        }
+
+        .menu-item:hover {
+            background: #f5f5f5;
+        }
+
+        .logout-button {
+            color: #ff4444;
+        }
+
+        .logout-button:hover {
+            background: #fff0f0 !important;
+        }
     </style>
 
     <script>
         let map;
         let freeRunActive = false;
+        let currentUser = null;
+
         function getMap() {
             map = new atlas.Map('myMap', {
                 center: [34.8, 32.1],
@@ -197,10 +331,10 @@
                                     window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'openEventDisplay', eventObject: events[i]}}));
                                 });
 
-                                // For now, fake current user as 'user123'
-                                //if (host === 'user123') {
-                                //    window.myEvents.push({ id, name, latitude, longitude });
-                                //}
+                                if (host === currentUser) {
+                                    // Show delete button for events created by current user
+                                    // ... rest of the code ...
+                                }
                             }
 
                             // Update the "My Events" list
@@ -710,6 +844,45 @@
 
         // free run ends here
 
+        // Add a function to receive the username from React Native
+        window.addEventListener('message', function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type === 'userIdentity') {
+                    currentUser = data.username;
+                    // Update username display
+                    const userElements = document.getElementsByClassName('current-user');
+                    for (let element of userElements) {
+                        element.textContent = currentUser;
+                    }
+                }
+            } catch (error) {
+                console.error('Error processing message:', error);
+            }
+        });
+
+        // Add logout function
+        function handleLogout() {
+            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'logout'}}));
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const menuButton = document.getElementById('userMenuButton');
+            const dropdown = document.getElementById('userMenuDropdown');
+
+            menuButton.addEventListener('click', function(e) {
+                e.stopPropagation();
+                dropdown.classList.toggle('show');
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', function(e) {
+                if (!menuButton.contains(e.target) && !dropdown.contains(e.target)) {
+                    dropdown.classList.remove('show');
+                }
+            });
+        });
+
     </script>
 </head>
 <body onload="getMap()">
@@ -723,15 +896,17 @@
 
 <button id="userBtn" onclick="toggleUserMenu()">👤</button>
 <div id="userMenu" style="display:none;">
-    <div id="userCard">
+    <div id="userCard" class="user-card">
+        <div class="user-menu">
         <h3>User Info</h3>
         <p>user123</p>
-
+        </div>
         <div id="myEventsContainer">
             <h4>My Events</h4>
             <ul id="myEventsList"></ul>
         </div>
         <button onclick="closeUserMenu()">Close</button>
+        <button onclick="handleLogout()">Logout</button>
     </div>
 </div>
 <div id="freeRunControls" style="position: absolute; top: 10px; left: 10px; z-index: 1000;">

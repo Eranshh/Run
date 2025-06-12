@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View, Button, TouchableOpacity } from 'react-native';
+import { StyleSheet, Text, View, Button, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
 import * as SignalR from '@microsoft/signalr';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import CreateEventSheet from './CreateEventSheet';
 import CreateEventDisplay from './CreateEventDisplay';
 import LoginScreen from './LoginScreen';
@@ -56,7 +57,19 @@ const fetchWithRetry = async (url, options = {}) => {
   throw lastError;
 };
 
-function MainScreen() {
+const fetchWithAuth = async (url, options = {}) => {
+  const token = await AsyncStorage.getItem('userToken');
+  return fetchWithRetry(url, {
+    ...options,
+    headers: {
+      ...options.headers,
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+};
+
+function MainScreen({ navigation, username, userId, userToken }) {
   const [userType, setUserType] = useState(null);
   const [connection, setConnection] = useState(null);
   const [isSheetVisible, setIsSheetVisible] = useState(false);
@@ -143,7 +156,7 @@ function MainScreen() {
           // Refresh data after reconnection
           getAllOpenEvents();
           getAllTracks();
-          getUsersEvents();
+          //getUsersEvents(user_id);
         });
 
         signalrConnection.onclose(() => {
@@ -200,33 +213,38 @@ function MainScreen() {
     };
   }, [mapReady]);
 
+  useEffect(() => {
+    if (mapReady && username) {
+      // Send username to WebView
+      webViewRef.current?.postMessage(
+        JSON.stringify({
+          type: 'userIdentity',
+          username: username
+        })
+      );
+    }
+  }, [mapReady, username]);
 
   const createEvent = async (event) => {
     try {
-      console.log("Creating event with data:", event);
-      const data = await fetchWithRetry('https://runfuncionapp.azurewebsites.net/api/createEvent', {
+      const response = await fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/createEvent', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
+          ...event,
+          trainerId: userId, // Use userId for API calls
           timestamp: new Date().toISOString(),
-          latitude: event.latitude,
-          longitude: event.longitude,
-          trainerId: 'user123',
-          name: event.name,
-          trackId: event.trackId,
-          startTime: event.start_time,
-          difficulty: event.difficulty,
-          type: event.type,
-          host: event.trainerId,
-          status: event.status,
         }),
       });
-      console.log('Event created:', data);
+
+      if (!response.ok) {
+        throw new Error('Failed to create event');
+      }
+
+      // Refresh events list
+      getAllOpenEvents();
     } catch (error) {
       console.error('Error creating event:', error);
-      // Handle error appropriately
+      Alert.alert('Error', 'Failed to create event');
     }
   };
 
@@ -251,23 +269,25 @@ function MainScreen() {
     }
   };
 
-  const joinEvent = async (event_id, user_id) => {
+  const joinEvent = async (event_id) => {
     try {
-      const data = await fetchWithRetry('https://runfuncionapp.azurewebsites.net/api/joinEvent', {
+      const response = await fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/joinEvent', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           eventId: event_id,
-          userId: user_id
+          userId: userId, // Use userId for API calls
         }),
       });
-      console.log('User joined event:', data);
+
+      if (!response.ok) {
+        throw new Error('Failed to join event');
+      }
+
+      // Refresh user's events
       getUsersEvents();
     } catch (error) {
       console.error('Error joining event:', error);
-      // Handle error appropriately
+      Alert.alert('Error', 'Failed to join event');
     }
   };
 
@@ -297,8 +317,9 @@ function MainScreen() {
 
  const getUsersEvents = async () => {
   try {
-    const userId = "user123";
-    const data = await fetchWithRetry(`https://runfuncionapp.azurewebsites.net/api/getUsersEvents?userId=${encodeURIComponent(userId)}`);
+    const data = await fetchWithAuth(
+      `https://runfuncionapp.azurewebsites.net/api/getUsersEvents?userId=${encodeURIComponent(userId)}`
+    );
     console.log('Got Events:', data);
     let myEvents = data.map((event) => ({
       latitude: event.latitude,
@@ -337,15 +358,10 @@ const getAllTracks = async () => {
 
   const getEventUsersForDisplay = async (id, eventObject) => {
     try {
-      const data = await fetchWithRetry('https://runfuncionapp.azurewebsites.net/api/getEventRegisteredUsers', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          eventId: id,
-        }),
-      });
+      const data = await fetchWithAuth(
+        `https://runfuncionapp.azurewebsites.net/api/getEventUsers?eventId=${encodeURIComponent(id)}`
+      );
+      
       eventObject["usersList"] = data;
       setSelectedEvent(eventObject);
       console.log('Got users:', data);
@@ -367,9 +383,6 @@ const getAllTracks = async () => {
   };
   const handleSubmitEvent = (event) => {
     createEvent(event);
-    setTimeout(getUsersEvents,
-        1000
-    ); // wait for the event to be created then get the users events
     sheetRef.current?.snapToIndex(-1);
     setIsSheetVisible(false); // hide sheet
   };
@@ -383,67 +396,84 @@ const getAllTracks = async () => {
     webViewRef.current.postMessage(JSON.stringify({ type: 'startFreeRun' }));
   }
 
+  const handleLogout = async () => {
+    try {
+      // Clear all stored data
+      await AsyncStorage.multiRemove(['userToken', 'userId', 'username']);
+      
+      // Navigate to login screen
+      navigation.navigate('Login');
+    } catch (error) {
+      console.error('Error during logout:', error);
+      Alert.alert('Error', 'Failed to logout. Please try again.');
+    }
+  };
+
   // Listen for messages from the map:
   const handleWebViewMessage = (event) => {
     try {
-      const message = JSON.parse(event.nativeEvent.data);
-      console.log('Received message from WebView:', message);
-      if (message.data.action === "delete") {
-        console.log('Delete event:', message.data.id);
-        deleteEvent(message.data.id);
-      }
-      else if (message.data.action === "join") {
-        // const eventId = message.data.eventId;
-        joinEvent(message.data.id, "user123");
+        const data = JSON.parse(event.nativeEvent.data);
+        console.log('Received message from WebView:', data);
+
+        if (data.data.action === 'logout') {
+            handleLogout();
+            return;
+        }
+
+        if (data.data.action === "delete") {
+          console.log('Delete event:', data.data.id);
+          deleteEvent(data.data.id);
+        }
+        else if (data.data.action === "join") {
+          // const eventId = data.data.eventId;
+          joinEvent(data.data.id);
 
 
-      }else if (message.data.action === "getEvents") {
-        getAllOpenEvents();
-        webViewRef.current.postMessage(JSON.stringify(eventList));
-      } else if (message.data.action === "getUserLocation") {
-        console.log("sending location");
-        getUserLocation();
-      }else if (message.data.action === "confirmLocation") {
-        console.log("Location confirmed:", message.data.location);
-        setSelectedLocation(message.data.location);
-        setMode("mainMap");
-        // Reopen sheet
-        sheetRef.current?.snapToIndex(1);
-      } else if (message.data.action === 'trackSelected') {
-        console.log('Track selected:', message.data.trackId, ' Longitude: ', message.data.location.longitude, ' Latitude: ' , message.data.location.latitude);
-        const selectedTrackId = message.data.trackId;
-        setSelectedTrack(selectedTrackId);
-        setSelectedLocation(message.data.location);
-        openEventSheet();
-        setMode("mainMap");
-      } else if (message.data.action === 'cancelTrackSelection') {
-        console.log('Canceling track selection');
-        sheetRef.current?.snapToIndex(0);
-        setIsSheetVisible(false); // hide sheet
-        setMode("mainMap");
-      } else if (message.data.action === "log"){
-        //console.log("log message");
-        console.log(message.data.message);
-      } else if (message.data.action === "mapReady") {
-        console.log("Map is ready");
-        setMapReady(true);
-        getAllOpenEvents();
-        getAllTracks();
-        getUsersEvents();
-      } else if (message.data.action === "openEventDisplay") {
-        getEventUsersForDisplay(message.data.eventObject.id, message.data.eventObject);
-        openEventDisplay();
-      } else if (message.data.action === "enterFreeRunMode") {
-        setMode("freeRun")
-      } else if (message.data.action === "leaveFreeRunMode") {
-        setMode("mainMap");
-      }
-      
-      else {
-        console.warn('Unknown action:', message.data.action);
-      }
-    } catch (e) {
-      console.warn('Failed to parse WebView message', e);
+        }else if (data.data.action === "getEvents") {
+          getAllOpenEvents();
+          webViewRef.current.postMessage(JSON.stringify(eventList));
+        } else if (data.data.action === "getUserLocation") {
+          console.log("sending location");
+          getUserLocation();
+        }else if (data.data.action === "confirmLocation") {
+          console.log("Location confirmed:", data.data.location);
+          setSelectedLocation(data.data.location);
+          setMode("mainMap");
+          // Reopen sheet
+          sheetRef.current?.snapToIndex(1);
+        } else if (data.data.action === 'trackSelected') {
+          console.log('Track selected:', data.data.trackId, ' Longitude: ', data.data.location.longitude, ' Latitude: ' , data.data.location.latitude);
+          const selectedTrackId = data.data.trackId;
+          setSelectedTrack(selectedTrackId);
+          setSelectedLocation(data.data.location);
+          openEventSheet();
+          setMode("mainMap");
+        } else if (data.data.action === 'cancelTrackSelection') {
+          console.log('Canceling track selection');
+          sheetRef.current?.snapToIndex(0);
+          setIsSheetVisible(false); // hide sheet
+          setMode("mainMap");
+        } else if (data.data.action === "log"){
+          //console.log("log message");
+          console.log(data.data.message);
+        } else if (data.data.action === "mapReady") {
+          console.log("Map is ready");
+          setMapReady(true);
+          getAllOpenEvents();
+          getAllTracks();
+          getUsersEvents();
+        } else if (data.data.action === "openEventDisplay") {
+          getEventUsersForDisplay(data.data.eventObject.id, data.data.eventObject);
+          openEventDisplay();
+        } else if (data.data.action === "enterFreeRunMode") {
+          setMode("freeRun")
+        } else if (data.data.action === "leaveFreeRunMode") {
+          setMode("mainMap");
+        } else {
+          console.warn('Unknown action:', data.data.action);
+        }
+    } catch (error) {
+        console.error('Error handling WebView message:', error);
     }
   };
 
@@ -486,10 +516,11 @@ const getAllTracks = async () => {
         {isEventDisplayVisible && (
           <CreateEventDisplay
             ref={eventDisplayRef}
+            eventObject={selectedEvent}
             joinEvent={joinEvent}
             deleteEvent={deleteEvent}
-            eventObject={selectedEvent}
-            userId={"user123"}
+            userId={userId}
+            username={username}
             onClose={() => setIsEventDisplayVisible(false)}
           />
         )}
@@ -549,28 +580,90 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
     zIndex: 1000,
-  }
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
 });
 
 export default function App() {
+  const [isLoading, setIsLoading] = useState(true);
+  const [userToken, setUserToken] = useState(null);
+  const [userId, setUserId] = useState(null);
+  const [username, setUsername] = useState(null);
+
+  useEffect(() => {
+    // Check for stored token and validate it
+    const checkToken = async () => {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        const storedUsername = await AsyncStorage.getItem('username');
+        const storedUserId = await AsyncStorage.getItem('userId');
+        
+        if (token && storedUsername && storedUserId) {
+          // Verify token is still valid
+          const response = await fetch('https://runfuncionapp.azurewebsites.net/api/validate-token', {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+
+          if (response.ok) {
+            setUserToken(token);
+            setUsername(storedUsername);
+            setUserId(storedUserId);
+          } else {
+            // Token is invalid or expired, clear storage
+            await AsyncStorage.multiRemove(['userToken', 'username', 'userId']);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking token:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkToken();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
+  }
+
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="Login">
+      <Stack.Navigator>
         <Stack.Screen 
           name="Login" 
-          component={LoginScreen}
+          component={LoginScreen} 
           options={{ headerShown: false }}
         />
         <Stack.Screen 
           name="Register" 
-          component={RegisterScreen}
+          component={RegisterScreen} 
           options={{ headerShown: false }}
         />
         <Stack.Screen 
-          name="Main" 
-          component={MainScreen}
+          name="mainMap" 
           options={{ headerShown: false }}
-        />
+        >
+          {props => (
+            <MainScreen 
+              {...props}
+              username={username}
+              userId={userId}
+              userToken={userToken}
+            />
+          )}
+        </Stack.Screen>
       </Stack.Navigator>
     </NavigationContainer>
   );
