@@ -267,7 +267,7 @@ function MainScreen({ navigation, username, userId, userToken }) {
   const deleteEvent = async (id) => {
     try {
       console.log("deleting event: ", id);
-      const data = await fetchWithRetry('https://runfuncionapp.azurewebsites.net/api/deleteEvent', {
+      const data = await fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/deleteEvent', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
