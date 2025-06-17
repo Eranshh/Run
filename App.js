@@ -176,42 +176,58 @@ function MainScreen({ navigation, username, userId, userToken }) {
   }, []);
 
   useEffect(() => {
-    // Request location and track it:
-    let watcher;
-
     const startWatchingLocation = async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        console.warn('Permission to access location was denied');
-        return;
-      }
-
-      watcher = await Location.watchPositionAsync(
-        {
-          accuracy: Location.Accuracy.High,
-          timeInterval: 2000,
-          distanceInterval: 1,
-        },
-        (location) => {
-          // Send updated location to the WebView
-          webViewRef.current?.postMessage(
-            JSON.stringify({ type: 'userLocation', location })
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert(
+            'Location Permission Required',
+            'This app needs location access to function properly. Please enable location services.',
+            [{ text: 'OK' }]
           );
-            // update location in create event form
-            if( !isSheetVisible) {
-              //setLatitude(location.latitude.toString());
-              //setLongitude(location.longitude.toString());
-            }
+          return;
         }
-      );
+
+        const watcher = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.High,
+            timeInterval: 2000,
+            distanceInterval: 1,
+          },
+          (location) => {
+            if (webViewRef.current) {
+              webViewRef.current.postMessage(
+                JSON.stringify({ type: 'userLocation', location })
+              );
+            }
+          },
+          (error) => {
+            console.error('Location tracking error:', error);
+            Alert.alert(
+              'Location Error',
+              'There was an error tracking your location. Please check your location settings.',
+              [{ text: 'OK' }]
+            );
+          }
+        );
+
+        return () => {
+          if (watcher) {
+            watcher.remove();
+          }
+        };
+      } catch (error) {
+        console.error('Error setting up location:', error);
+        Alert.alert(
+          'Error',
+          'Failed to set up location tracking. Please restart the app.',
+          [{ text: 'OK' }]
+        );
+      }
     };
 
     startWatchingLocation();
-
-    return () => {
-      if (watcher) watcher.remove();
-    };
-  }, [mapReady]);
+  }, []);
 
   useEffect(() => {
     if (mapReady && username) {
@@ -477,6 +493,15 @@ const getAllTracks = async () => {
     }
   };
 
+  const handleWebViewError = (syntheticEvent) => {
+    const { nativeEvent } = syntheticEvent;
+    console.error('WebView error:', nativeEvent);
+    Alert.alert(
+      'Error',
+      'There was an error loading the map. Please check your internet connection and try again.',
+      [{ text: 'OK' }]
+    );
+  };
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -488,6 +513,11 @@ const getAllTracks = async () => {
         javaScriptEnabled={true}
         domStorageEnabled={true}
         style={{ flex: 1 }}
+        onError={handleWebViewError}
+        onHttpError={(syntheticEvent) => {
+          const { nativeEvent } = syntheticEvent;
+          console.error('WebView HTTP error:', nativeEvent);
+        }}
         onMessage={handleWebViewMessage}
         />
         {mode === "mainMap" && (
@@ -605,12 +635,13 @@ export default function App() {
         
         if (token && storedUsername && storedUserId) {
           // Verify token is still valid
+          console.log("Validating token");
           const response = await fetch('https://runfuncionapp.azurewebsites.net/api/validate-token', {
             headers: {
               'Authorization': `Bearer ${token}`
             }
           });
-
+          console.log("Token validation response:", response);
           if (response.ok) {
             setUserToken(token);
             setUsername(storedUsername);
@@ -641,29 +672,36 @@ export default function App() {
   return (
     <NavigationContainer>
       <Stack.Navigator>
-        <Stack.Screen 
-          name="Login" 
-          component={LoginScreen} 
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen 
-          name="Register" 
-          component={RegisterScreen} 
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen 
-          name="mainMap" 
-          options={{ headerShown: false }}
-        >
-          {props => (
-            <MainScreen 
-              {...props}
-              username={username}
-              userId={userId}
-              userToken={userToken}
+        {!userToken ? (
+          // Auth screens
+          <>
+            <Stack.Screen 
+              name="Login" 
+              component={LoginScreen} 
+              options={{ headerShown: false }}
             />
-          )}
-        </Stack.Screen>
+            <Stack.Screen 
+              name="Register" 
+              component={RegisterScreen} 
+              options={{ headerShown: false }}
+            />
+          </>
+        ) : (
+          // Main app screen
+          <Stack.Screen 
+            name="mainMap" 
+            options={{ headerShown: false }}
+          >
+            {props => (
+              <MainScreen 
+                {...props}
+                username={username}
+                userId={userId}
+                userToken={userToken}
+              />
+            )}
+          </Stack.Screen>
+        )}
       </Stack.Navigator>
     </NavigationContainer>
   );
