@@ -10,6 +10,8 @@ import {
   Alert,
 } from 'react-native';
 import { fetchWithAuth } from './utils/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CommonActions } from '@react-navigation/native';
 
 const RunItem = ({ run }) => (
   <TouchableOpacity style={styles.runItem}>
@@ -48,9 +50,18 @@ const RunItem = ({ run }) => (
   </TouchableOpacity>
 );
 
-export default function UserProfileScreen({ navigation, username, userId }) {
+export default function UserProfileScreen({ navigation, username, userId, onLogout }) {
   const [runs, setRuns] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const handleLogout = async () => {
+    try {
+      await onLogout();
+    } catch (error) {
+      console.error('Error during logout:', error);
+      Alert.alert('Error', 'Failed to logout. Please try again.');
+    }
+  };
 
   useEffect(() => {
     const getUserRuns = async () => {
@@ -85,8 +96,16 @@ export default function UserProfileScreen({ navigation, username, userId }) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.username}>{username}</Text>
-        <Text style={styles.subtitle}>Run History</Text>
+        <View style={styles.headerContent}>
+          <Text style={styles.username}>{username}</Text>
+          <Text style={styles.subtitle}>Run History</Text>
+        </View>
+        <TouchableOpacity 
+          style={styles.logoutButton}
+          onPress={handleLogout}
+        >
+          <Text style={styles.logoutText}>Logout</Text>
+        </TouchableOpacity>
       </View>
       
       <FlatList
@@ -119,6 +138,12 @@ const styles = StyleSheet.create({
   header: {
     padding: 20,
     backgroundColor: '#007AFF',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerContent: {
+    flex: 1,
   },
   username: {
     fontSize: 24,
@@ -130,6 +155,17 @@ const styles = StyleSheet.create({
     color: 'white',
     opacity: 0.8,
     marginTop: 5,
+  },
+  logoutButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  logoutText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '500',
   },
   listContainer: {
     padding: 16,

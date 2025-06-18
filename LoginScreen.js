@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export default function LoginScreen({ navigation }) {
+export default function LoginScreen({ navigation, onLogin }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -44,15 +44,8 @@ export default function LoginScreen({ navigation }) {
         throw new Error(data.error || 'Login failed');
       }
 
-      // Store the token, username, and userId if remember me is checked
-      if (rememberMe) {
-        await AsyncStorage.setItem('userToken', data.token);
-        await AsyncStorage.setItem('username', data.username);
-        await AsyncStorage.setItem('userId', data.user_id);
-      }
-
-      // Navigate to main app screen
-      navigation.replace('mainMap');
+      // Call onLogin with the user data
+      await onLogin(data.token, data.user_id, data.username);
     } catch (error) {
       Alert.alert('Error', error.message || 'Failed to login. Please check your credentials.');
     } finally {

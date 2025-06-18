@@ -404,14 +404,12 @@ const getAllTracks = async () => {
 
   const handleLogout = async () => {
     try {
-      // Clear all stored data
       await AsyncStorage.multiRemove(['userToken', 'userId', 'username']);
-      
-      // Navigate to login screen
-      navigation.navigate('Login');
+      setUserToken(null);
+      setUserId(null);
+      setUsername(null);
     } catch (error) {
       console.error('Error during logout:', error);
-      Alert.alert('Error', 'Failed to logout. Please try again.');
     }
   };
 
@@ -615,6 +613,31 @@ export default function App() {
   const [userId, setUserId] = useState(null);
   const [username, setUsername] = useState(null);
 
+  const handleLogout = async () => {
+    try {
+      await AsyncStorage.multiRemove(['userToken', 'userId', 'username']);
+      setUserToken(null);
+      setUserId(null);
+      setUsername(null);
+    } catch (error) {
+      console.error('Error during logout:', error);
+    }
+  };
+
+  const handleLogin = async (token, userId, username) => {
+    try {
+      await AsyncStorage.setItem('userToken', token);
+      await AsyncStorage.setItem('userId', userId);
+      await AsyncStorage.setItem('username', username);
+      setUserToken(token);
+      setUserId(userId);
+      setUsername(username);
+    } catch (error) {
+      console.error('Error during login:', error);
+      throw error;
+    }
+  };
+
   useEffect(() => {
     // Check for stored token and validate it
     const checkToken = async () => {
@@ -667,9 +690,15 @@ export default function App() {
           <>
             <Stack.Screen 
               name="Login" 
-              component={LoginScreen} 
               options={{ headerShown: false }}
-            />
+            >
+              {props => (
+                <LoginScreen 
+                  {...props}
+                  onLogin={handleLogin}
+                />
+              )}
+            </Stack.Screen>
             <Stack.Screen 
               name="Register" 
               component={RegisterScreen} 
@@ -710,6 +739,7 @@ export default function App() {
                   {...props}
                   username={username}
                   userId={userId}
+                  onLogout={handleLogout}
                 />
               )}
             </Stack.Screen>
