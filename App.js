@@ -14,6 +14,8 @@ import LoginScreen from './LoginScreen';
 import RegisterScreen from './RegisterScreen';
 import { get } from 'react-native/Libraries/TurboModule/TurboModuleRegistry';
 import { ConsoleLogger } from '@microsoft/signalr/dist/esm/Utils';
+import UserProfileScreen from './UserProfileScreen';
+import { fetchWithAuth } from './utils/api';
 
 const Stack = createNativeStackNavigator();
 
@@ -55,18 +57,6 @@ const fetchWithRetry = async (url, options = {}) => {
   }
   
   throw lastError;
-};
-
-const fetchWithAuth = async (url, options = {}) => {
-  const token = await AsyncStorage.getItem('userToken');
-  return fetchWithRetry(url, {
-    ...options,
-    headers: {
-      ...options.headers,
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  });
 };
 
 function MainScreen({ navigation, username, userId, userToken }) {
@@ -414,14 +404,12 @@ const getAllTracks = async () => {
 
   const handleLogout = async () => {
     try {
-      // Clear all stored data
       await AsyncStorage.multiRemove(['userToken', 'userId', 'username']);
-      
-      // Navigate to login screen
-      navigation.navigate('Login');
+      setUserToken(null);
+      setUserId(null);
+      setUsername(null);
     } catch (error) {
       console.error('Error during logout:', error);
-      Alert.alert('Error', 'Failed to logout. Please try again.');
     }
   };
 
@@ -441,17 +429,17 @@ const getAllTracks = async () => {
           deleteEvent(data.data.id);
         }
         else if (data.data.action === "join") {
-          // const eventId = data.data.eventId;
           joinEvent(data.data.id);
-
-
-        }else if (data.data.action === "getEvents") {
+        }
+        else if (data.data.action === "getEvents") {
           getAllOpenEvents();
           webViewRef.current.postMessage(JSON.stringify(eventList));
         } else if (data.data.action === "getUserLocation") {
           console.log("sending location");
           getUserLocation();
-        }else if (data.data.action === "confirmLocation") {
+        } else if (data.data.action === "navigateToProfile") {
+          navigation.navigate('UserProfile');
+        } else if (data.data.action === "confirmLocation") {
           console.log("Location confirmed:", data.data.location);
           setSelectedLocation(data.data.location);
           setMode("mainMap");
@@ -625,6 +613,31 @@ export default function App() {
   const [userId, setUserId] = useState(null);
   const [username, setUsername] = useState(null);
 
+  const handleLogout = async () => {
+    try {
+      await AsyncStorage.multiRemove(['userToken', 'userId', 'username']);
+      setUserToken(null);
+      setUserId(null);
+      setUsername(null);
+    } catch (error) {
+      console.error('Error during logout:', error);
+    }
+  };
+
+  const handleLogin = async (token, userId, username) => {
+    try {
+      await AsyncStorage.setItem('userToken', token);
+      await AsyncStorage.setItem('userId', userId);
+      await AsyncStorage.setItem('username', username);
+      setUserToken(token);
+      setUserId(userId);
+      setUsername(username);
+    } catch (error) {
+      console.error('Error during login:', error);
+      throw error;
+    }
+  };
+
   useEffect(() => {
     // Check for stored token and validate it
     const checkToken = async () => {
@@ -677,9 +690,15 @@ export default function App() {
           <>
             <Stack.Screen 
               name="Login" 
-              component={LoginScreen} 
               options={{ headerShown: false }}
-            />
+            >
+              {props => (
+                <LoginScreen 
+                  {...props}
+                  onLogin={handleLogin}
+                />
+              )}
+            </Stack.Screen>
             <Stack.Screen 
               name="Register" 
               component={RegisterScreen} 
@@ -687,20 +706,44 @@ export default function App() {
             />
           </>
         ) : (
-          // Main app screen
-          <Stack.Screen 
-            name="mainMap" 
-            options={{ headerShown: false }}
-          >
-            {props => (
-              <MainScreen 
-                {...props}
-                username={username}
-                userId={userId}
-                userToken={userToken}
-              />
-            )}
-          </Stack.Screen>
+          // Main app screens
+          <>
+            <Stack.Screen 
+              name="mainMap" 
+              options={{ headerShown: false }}
+            >
+              {props => (
+                <MainScreen 
+                  {...props}
+                  username={username}
+                  userId={userId}
+                  userToken={userToken}
+                />
+              )}
+            </Stack.Screen>
+            <Stack.Screen 
+              name="UserProfile" 
+              options={{ 
+                title: 'Profile',
+                headerStyle: {
+                  backgroundColor: '#007AFF',
+                },
+                headerTintColor: '#fff',
+                headerTitleStyle: {
+                  fontWeight: 'bold',
+                },
+              }}
+            >
+              {props => (
+                <UserProfileScreen 
+                  {...props}
+                  username={username}
+                  userId={userId}
+                  onLogout={handleLogout}
+                />
+              )}
+            </Stack.Screen>
+          </>
         )}
       </Stack.Navigator>
     </NavigationContainer>

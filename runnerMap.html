@@ -883,6 +883,14 @@
             });
         });
 
+        function navigateToProfile() {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+                data: {
+                    action: 'navigateToProfile'
+                }
+            }));
+        }
+
     </script>
 </head>
 <body onload="getMap()">
@@ -894,21 +902,8 @@
         ✅
     </button>
 
-<button id="userBtn" onclick="toggleUserMenu()">👤</button>
-<div id="userMenu" style="display:none;">
-    <div id="userCard" class="user-card">
-        <div class="user-menu">
-        <h3>User Info</h3>
-        <p>user123</p>
-        </div>
-        <div id="myEventsContainer">
-            <h4>My Events</h4>
-            <ul id="myEventsList"></ul>
-        </div>
-        <button onclick="closeUserMenu()">Close</button>
-        <button onclick="handleLogout()">Logout</button>
-    </div>
-</div>
+<button id="userBtn" onclick="navigateToProfile()">👤</button>
+
 <div id="freeRunControls" style="position: absolute; top: 10px; left: 10px; z-index: 1000;">
   <button id="pauseFreeRunBtn" style="display:none;">⏸️</button>
   <button id="stopFreeRunBtn" style="display:none;">⏹</button>
