@@ -14,6 +14,7 @@ import LoginScreen from './LoginScreen';
 import RegisterScreen from './RegisterScreen';
 import { get } from 'react-native/Libraries/TurboModule/TurboModuleRegistry';
 import { ConsoleLogger } from '@microsoft/signalr/dist/esm/Utils';
+import UserProfileScreen from './UserProfileScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -441,17 +442,17 @@ const getAllTracks = async () => {
           deleteEvent(data.data.id);
         }
         else if (data.data.action === "join") {
-          // const eventId = data.data.eventId;
           joinEvent(data.data.id);
-
-
-        }else if (data.data.action === "getEvents") {
+        }
+        else if (data.data.action === "getEvents") {
           getAllOpenEvents();
           webViewRef.current.postMessage(JSON.stringify(eventList));
         } else if (data.data.action === "getUserLocation") {
           console.log("sending location");
           getUserLocation();
-        }else if (data.data.action === "confirmLocation") {
+        } else if (data.data.action === "navigateToProfile") {
+          navigation.navigate('UserProfile');
+        } else if (data.data.action === "confirmLocation") {
           console.log("Location confirmed:", data.data.location);
           setSelectedLocation(data.data.location);
           setMode("mainMap");
@@ -687,20 +688,42 @@ export default function App() {
             />
           </>
         ) : (
-          // Main app screen
-          <Stack.Screen 
-            name="mainMap" 
-            options={{ headerShown: false }}
-          >
-            {props => (
-              <MainScreen 
-                {...props}
-                username={username}
-                userId={userId}
-                userToken={userToken}
-              />
-            )}
-          </Stack.Screen>
+          // Main app screens
+          <>
+            <Stack.Screen 
+              name="mainMap" 
+              options={{ headerShown: false }}
+            >
+              {props => (
+                <MainScreen 
+                  {...props}
+                  username={username}
+                  userId={userId}
+                  userToken={userToken}
+                />
+              )}
+            </Stack.Screen>
+            <Stack.Screen 
+              name="UserProfile" 
+              options={{ 
+                title: 'Profile',
+                headerStyle: {
+                  backgroundColor: '#007AFF',
+                },
+                headerTintColor: '#fff',
+                headerTitleStyle: {
+                  fontWeight: 'bold',
+                },
+              }}
+            >
+              {props => (
+                <UserProfileScreen 
+                  {...props}
+                  username={username}
+                />
+              )}
+            </Stack.Screen>
+          </>
         )}
       </Stack.Navigator>
     </NavigationContainer>
