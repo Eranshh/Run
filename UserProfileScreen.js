@@ -7,50 +7,38 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   SafeAreaView,
+  Alert,
 } from 'react-native';
-
-// Placeholder data for development
-const MOCK_RUNS = [
-  {
-    id: '1',
-    date: '2024-03-15',
-    distance: 5.2,
-    duration: 32,
-    type: 'Free Run',
-    route: 'Tel Aviv Beach',
-  },
-  {
-    id: '2',
-    date: '2024-03-14',
-    distance: 3.8,
-    duration: 25,
-    type: 'Event',
-    route: 'Park Hayarkon',
-  },
-  {
-    id: '3',
-    date: '2024-03-12',
-    distance: 7.5,
-    duration: 45,
-    type: 'Free Run',
-    route: 'City Center',
-  },
-];
+import { fetchWithAuth } from './utils/api';
 
 const RunItem = ({ run }) => (
   <TouchableOpacity style={styles.runItem}>
     <View style={styles.runHeader}>
-      <Text style={styles.runDate}>{run.date}</Text>
+      <Text style={styles.runDate}>{new Date(run.date).toLocaleDateString()}</Text>
       <Text style={styles.runType}>{run.type}</Text>
     </View>
     <View style={styles.runDetails}>
       <View style={styles.detailItem}>
         <Text style={styles.detailLabel}>Distance</Text>
-        <Text style={styles.detailValue}>{run.distance} km</Text>
+        <Text style={styles.detailValue}>{(run.distance / 1000).toFixed(2)} km</Text>
       </View>
       <View style={styles.detailItem}>
         <Text style={styles.detailLabel}>Duration</Text>
-        <Text style={styles.detailValue}>{run.duration} min</Text>
+        <Text style={styles.detailValue}>{Math.floor(run.duration / 60)} min</Text>
+      </View>
+      <View style={styles.detailItem}>
+        <Text style={styles.detailLabel}>Pace</Text>
+        <Text style={styles.detailValue}>{run.averagePace?.toFixed(2) || 'N/A'} min/km</Text>
+      </View>
+    </View>
+    <View style={styles.runDetails}>
+      <View style={styles.detailItem}>
+        <Text style={styles.detailLabel}>Speed</Text>
+        <Text style={styles.detailValue}>{run.averageSpeed?.toFixed(1) || 'N/A'} km/h</Text>
+      </View>
+      <View style={styles.detailItem}>
+        <Text style={styles.detailLabel}>Calories</Text>
+        <Text style={styles.detailValue}>{run.calories?.toFixed(0) || 'N/A'}</Text>
       </View>
       <View style={styles.detailItem}>
         <Text style={styles.detailLabel}>Route</Text>
@@ -60,26 +48,31 @@ const RunItem = ({ run }) => (
   </TouchableOpacity>
 );
 
-export default function UserProfileScreen({ navigation, username }) {
+export default function UserProfileScreen({ navigation, username, userId }) {
   const [runs, setRuns] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // TODO: Replace with actual API call
-    const fetchUserRuns = async () => {
+    const getUserRuns = async () => {
       try {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        setRuns(MOCK_RUNS);
+        console.log("Fetching runs for user:", userId);
+        const data = await fetchWithAuth(
+          `https://runfuncionapp.azurewebsites.net/api/getUsersActivities?userId=${encodeURIComponent(userId)}`
+        );
+        setRuns(data);
       } catch (error) {
         console.error('Error fetching runs:', error);
+        Alert.alert(
+          'Error',
+          'Failed to load your run history. Please try again later.'
+        );
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchUserRuns();
-  }, []);
+    getUserRuns();
+  }, [userId]);
 
   if (isLoading) {
     return (
@@ -102,6 +95,12 @@ export default function UserProfileScreen({ navigation, username }) {
         keyExtractor={item => item.id}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No runs recorded yet</Text>
+            <Text style={styles.emptySubtext}>Start running to see your history here!</Text>
+          </View>
+        }
       />
     </SafeAreaView>
   );
@@ -167,6 +166,7 @@ const styles = StyleSheet.create({
   runDetails: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: 8,
   },
   detailItem: {
     flex: 1,
@@ -180,5 +180,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     fontWeight: '500',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
   },
 }); 

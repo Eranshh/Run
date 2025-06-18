@@ -15,6 +15,7 @@ import RegisterScreen from './RegisterScreen';
 import { get } from 'react-native/Libraries/TurboModule/TurboModuleRegistry';
 import { ConsoleLogger } from '@microsoft/signalr/dist/esm/Utils';
 import UserProfileScreen from './UserProfileScreen';
+import { fetchWithAuth } from './utils/api';
 
 const Stack = createNativeStackNavigator();
 
@@ -56,18 +57,6 @@ const fetchWithRetry = async (url, options = {}) => {
   }
   
   throw lastError;
-};
-
-const fetchWithAuth = async (url, options = {}) => {
-  const token = await AsyncStorage.getItem('userToken');
-  return fetchWithRetry(url, {
-    ...options,
-    headers: {
-      ...options.headers,
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  });
 };
 
 function MainScreen({ navigation, username, userId, userToken }) {
@@ -720,6 +709,7 @@ export default function App() {
                 <UserProfileScreen 
                   {...props}
                   username={username}
+                  userId={userId}
                 />
               )}
             </Stack.Screen>
