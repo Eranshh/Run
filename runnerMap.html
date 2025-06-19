@@ -799,6 +799,29 @@
 
             window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'leaveFreeRunMode'}}));
             // drawSummaryRoute();
+
+            // Calculate stats
+            const duration = totalRunTime; // in seconds
+            const averageSpeed = totalDistance > 0 ? (totalDistance / duration) * 3.6 : 0; // km/h
+            const averagePace = totalDistance > 0 ? (duration / 60) / (totalDistance / 1000) : 0; // min/km
+            const calories = estimateCalories(totalDistance);
+
+            // Build activity object
+            const activity = {
+                userId: currentUser, // or get from storage/context
+                timestamp: new Date().toISOString(),
+                distance: totalDistance,
+                duration: duration,
+                averageSpeed: averageSpeed,
+                averagePace: averagePace,
+                calories: calories,
+                start_time: new Date(freeRunStartTime).toISOString(),
+                stop_time: new Date().toISOString(),
+                type: 'free run', // or other type
+                path: freeRunPath // if you want to store the path
+            };
+
+            createActivity(activity);
         }
 
         function closeRunSummary() {
@@ -888,6 +911,12 @@
                 data: {
                     action: 'navigateToProfile'
                 }
+            }));
+        }
+
+        function createActivity(activity) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+                data:{ action: 'logRun', activity: activity}
             }));
         }
 

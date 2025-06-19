@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="initial-scale=1.0, width=device-width" />
+  <script src="https://atlas.microsoft.com/sdk/javascript/mapcontrol/3/atlas.min.js"></script>
+  <link rel="stylesheet" href="https://atlas.microsoft.com/sdk/javascript/mapcontrol/3/atlas.min.css" />
+  <style>
+    html, body, #map { width: 100%; height: 100%; margin: 0; padding: 0; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <script>
+    let map, routeLine;
+
+    function drawRoute(path) {
+      if (!map || !path || path.length === 0) return;
+      if (routeLine) map.sources.remove(routeLine);
+
+      const dataSource = new atlas.source.DataSource();
+      map.sources.add(dataSource);
+      dataSource.add(new atlas.data.Feature(new atlas.data.LineString(path)));
+
+      const lineLayer = new atlas.layer.LineLayer(dataSource, null, {
+        strokeColor: 'blue',
+        strokeWidth: 4
+      });
+      map.layers.add(lineLayer);
+      routeLine = dataSource;
+    }
+
+    function centerMap(path) {
+      if (map && path && path.length > 0) {
+        map.setCamera({
+          center: path[0],
+          zoom: 15
+        });
+      }
+    }
+
+    window.addEventListener('message', function(event) {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.path) {
+          drawRoute(data.path);
+          centerMap(data.path);
+        }
+      } catch (e) {
+        // ignore
+      }
+    });
+
+    function initMap() {
+      map = new atlas.Map('map', {
+        center: [34.8, 32.1],
+        zoom: 10,
+        view: 'Auto',
+        authOptions: {
+          authType: 'subscriptionKey',
+          subscriptionKey: 'YOUR_AZURE_MAPS_KEY'
+        }
+      });
+    }
+    window.onload = initMap;
+  </script>
+</body>
+</html>

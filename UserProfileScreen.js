@@ -13,8 +13,8 @@ import { fetchWithAuth } from './utils/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CommonActions } from '@react-navigation/native';
 
-const RunItem = ({ run }) => (
-  <TouchableOpacity style={styles.runItem}>
+const RunItem = ({ run, onPress }) => (
+  <TouchableOpacity style={styles.runItem} onPress={() => onPress(run)}>
     <View style={styles.runHeader}>
       <Text style={styles.runDate}>{new Date(run.date).toLocaleDateString()}</Text>
       <Text style={styles.runType}>{run.type}</Text>
@@ -53,6 +53,7 @@ const RunItem = ({ run }) => (
 export default function UserProfileScreen({ navigation, username, userId, onLogout }) {
   const [runs, setRuns] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [userTracks, setUserTracks] = useState([]);
 
   const handleLogout = async () => {
     try {
@@ -63,13 +64,19 @@ export default function UserProfileScreen({ navigation, username, userId, onLogo
     }
   };
 
+  const handleRunPress = (run) => {
+    const track = userTracks.find(t => t.trackId === run.trackId);
+    navigation.navigate('RunSummary', { run, track });
+  };
+
   useEffect(() => {
     const getUserRuns = async () => {
       try {
         console.log("Fetching runs for user:", userId);
-        const data = await fetchWithAuth(
+        const response = await fetchWithAuth(
           `https://runfuncionapp.azurewebsites.net/api/getUsersActivities?userId=${encodeURIComponent(userId)}`
         );
+        const data = await response.json();
         setRuns(data);
       } catch (error) {
         console.error('Error fetching runs:', error);
@@ -83,6 +90,21 @@ export default function UserProfileScreen({ navigation, username, userId, onLogo
     };
 
     getUserRuns();
+  }, [userId]);
+
+  useEffect(() => {
+    const getUserTracks = async () => {
+      try {
+        const response = await fetchWithAuth(
+          `https://runfuncionapp.azurewebsites.net/api/getUsersTracks?userId=${encodeURIComponent(userId)}`
+        );
+        const data = await response.json();
+        setUserTracks(data);
+      } catch (error) {
+        console.error('Error fetching tracks:', error);
+      }
+    };
+    getUserTracks();
   }, [userId]);
 
   if (isLoading) {
@@ -110,7 +132,7 @@ export default function UserProfileScreen({ navigation, username, userId, onLogo
       
       <FlatList
         data={runs}
-        renderItem={({ item }) => <RunItem run={item} />}
+        renderItem={({ item }) => <RunItem run={item} onPress={handleRunPress} />}
         keyExtractor={item => item.id}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}

@@ -16,6 +16,7 @@ import { get } from 'react-native/Libraries/TurboModule/TurboModuleRegistry';
 import { ConsoleLogger } from '@microsoft/signalr/dist/esm/Utils';
 import UserProfileScreen from './UserProfileScreen';
 import { fetchWithAuth } from './utils/api';
+import RunSummaryScreen from './RunSummaryScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -257,7 +258,7 @@ function MainScreen({ navigation, username, userId, userToken }) {
   const deleteEvent = async (id) => {
     try {
       console.log("deleting event: ", id);
-      const data = await fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/deleteEvent', {
+      const response = await fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/deleteEvent', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -266,6 +267,7 @@ function MainScreen({ navigation, username, userId, userToken }) {
           eventId: id
         }),
       });
+      const data = await response.json();
       console.log('Event deleted successfully:', data);
       eventList.events = eventList.events.filter(event => event.id !== data.eventId);
       webViewRef.current.postMessage(JSON.stringify(eventList));
@@ -323,9 +325,10 @@ function MainScreen({ navigation, username, userId, userToken }) {
 
  const getUsersEvents = async () => {
   try {
-    const data = await fetchWithAuth(
+    const response = await fetchWithAuth(
       `https://runfuncionapp.azurewebsites.net/api/getUsersEvents?userId=${encodeURIComponent(userId)}`
     );
+    const data = await response.json();
     console.log('Got Events:', data);
     let myEvents = data.map((event) => ({
       latitude: event.latitude,
@@ -377,6 +380,72 @@ const getAllTracks = async () => {
     }
   };
 
+  const createTrack = async (track) => {
+    console.log("Creating track:", track);
+    try {
+      const response = await fetchWithAuth(
+        'https://runfuncionapp.azurewebsites.net/api/createTrack',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({path: track})
+        }
+      );
+      console.log('createTrack response status:', response.status);
+      if (!response.ok) {
+        let errorMsg = 'Failed to create track';
+        try {
+          const errorData = await response.json();
+          errorMsg += ': ' + (errorData.error || JSON.stringify(errorData));
+        } catch (e) {
+          // fallback to text
+          try {
+            const errorText = await response.text();
+            errorMsg += ': ' + errorText;
+          } catch (e2) {}
+        }
+        throw new Error(errorMsg);
+      }
+      const data = await response.json();
+      console.log('Track created successfully');
+      return data.trackId;
+    } catch (error) {
+      console.error('Error creating track:', error);
+      return null;
+    } 
+  };
+
+  const createActivity = async (activity) => {
+    console.log("Logging run to database:", activity);
+    activity.userId = userId;
+    let track_id = await createTrack(activity.path);
+    if (!track_id) {
+      console.error('Error creating track');
+      return;
+    }
+    activity.trackId = track_id;
+    try {
+        const response = await fetchWithAuth(
+            'https://runfuncionapp.azurewebsites.net/api/createActivity',
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(activity)
+            }
+        );
+        if (!response.ok) {
+            // Try to read the error message from the response
+            let errorMsg = `HTTP error! status: ${response.status}`;
+            const errorData = response.error;
+            errorMsg += ` | Details: ${JSON.stringify(errorData)}`;
+            throw new Error(errorMsg);
+        }
+        console.log('Activity logged successfully');
+    } catch (error) {
+        console.error('Error logging activity:', error);
+    }
+  };
+
   const handleSelectLocation = () => {
     console.log("Entering location select mode");
     setMode("selectingLocation");
@@ -402,27 +471,11 @@ const getAllTracks = async () => {
     webViewRef.current.postMessage(JSON.stringify({ type: 'startFreeRun' }));
   }
 
-  const handleLogout = async () => {
-    try {
-      await AsyncStorage.multiRemove(['userToken', 'userId', 'username']);
-      setUserToken(null);
-      setUserId(null);
-      setUsername(null);
-    } catch (error) {
-      console.error('Error during logout:', error);
-    }
-  };
-
   // Listen for messages from the map:
   const handleWebViewMessage = (event) => {
     try {
         const data = JSON.parse(event.nativeEvent.data);
         console.log('Received message from WebView:', data);
-
-        if (data.data.action === 'logout') {
-            handleLogout();
-            return;
-        }
 
         if (data.data.action === "delete") {
           console.log('Delete event:', data.data.id);
@@ -473,6 +526,9 @@ const getAllTracks = async () => {
           setMode("freeRun")
         } else if (data.data.action === "leaveFreeRunMode") {
           setMode("mainMap");
+        } else if (data.data.action === "logRun") {
+          console.log("Logging run to database");
+          createActivity(data.data.activity);
         } else {
           console.warn('Unknown action:', data.data.action);
         }
@@ -740,6 +796,27 @@ export default function App() {
                   username={username}
                   userId={userId}
                   onLogout={handleLogout}
+                />
+              )}
+            </Stack.Screen>
+            <Stack.Screen 
+              name="RunSummary" 
+              options={{ 
+                title: 'Run Summary',
+                headerStyle: {
+                  backgroundColor: '#007AFF',
+                },
+                headerTintColor: '#fff',
+                headerTitleStyle: {
+                  fontWeight: 'bold',
+                },
+              }}
+            >
+              {props => (
+                <RunSummaryScreen 
+                  {...props}
+                  username={username}
+                  userId={userId}
                 />
               )}
             </Stack.Screen>
