@@ -12,6 +12,12 @@ export default function RunSummaryScreen({ route }) {
     }
   }, [track]);
 
+  const sendPathToWebView = () => {
+    if (track && track.path && webViewRef.current) {
+      webViewRef.current.postMessage(JSON.stringify({ path: track.path }));
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{run.name || 'Run Summary'}</Text>
@@ -30,6 +36,7 @@ export default function RunSummaryScreen({ route }) {
           style={styles.map}
           javaScriptEnabled
           domStorageEnabled
+          onLoad={sendPathToWebView}
         />
       )}
     </View>

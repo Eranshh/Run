@@ -98,7 +98,12 @@ export default function UserProfileScreen({ navigation, username, userId, onLogo
         const response = await fetchWithAuth(
           `https://runfuncionapp.azurewebsites.net/api/getUsersTracks?userId=${encodeURIComponent(userId)}`
         );
+        console.log('Got response:', response);
         const data = await response.json();
+        if(!response.ok) {
+          throw new Error('Failed to fetch tracks');
+        }
+        console.log('Got data:', data);
         setUserTracks(data);
       } catch (error) {
         console.error('Error fetching tracks:', error);
