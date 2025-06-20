@@ -12,56 +12,128 @@
 <body>
   <div id="map"></div>
   <script>
-    let map, routeLine;
+    let map;
+    let summaryLineSource = null;
+    let summaryStartMarker = null;
+    let mapIsReady = false;
+    let pendingTrack = null;
+    
+    function initMap() {
+      console.log('Initializing map...');
+      map = new atlas.Map('map', {
+        center: [34.8, 32.1], // Default center (Israel)
+        zoom: 10,
+        view: 'Auto',
+        authOptions: {
+          authType: 'subscriptionKey',
+          subscriptionKey: 'BSDCG4i6BIsimtM5jNRtCupaIm4boJb8WM92OhKd3jL6x14l3W6mJQQJ99BEACi5YpzPSPD9AAAgAZMP337x'
+        }
+      });
 
-    function drawRoute(path) {
-      if (!map || !path || path.length === 0) return;
-      if (routeLine) map.sources.remove(routeLine);
+      map.events.add('ready', function() {
+        console.log('Map is ready');
+        mapIsReady = true;
+        if (pendingTrack) {
+          drawPath(pendingTrack);
+          pendingTrack = null;
+        }
+      });
+    }
 
+    function drawPath(track) {
+      let path = track.path || [];
+      window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'drawPath called. Path length: ' + path.length + '\nPath: ' + JSON.stringify(path)}}));
+      if (!map || !Array.isArray(path) || path.length === 0) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Map not ready or path invalid'}}));
+        return;
+      }
+
+      // Remove previous line if exists
+      if (summaryLineSource) {
+        map.sources.remove(summaryLineSource);
+        summaryLineSource = null;
+      }
+
+      // Remove previous start marker if exists
+      if (summaryStartMarker) {
+        map.markers.remove(summaryStartMarker);
+        summaryStartMarker = null;
+      }
+
+      // Add start marker
+      window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Adding start marker at: ' + JSON.stringify(path[0])}}));
+      const startMarker = new atlas.HtmlMarker({
+        position: path[0],
+        text: 'S',
+        color: 'green'
+      });
+      map.markers.add(startMarker);
+      summaryStartMarker = startMarker;
+      window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Start marker added'}}));
+
+      // Draw the path
+      window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Creating LineString'}}));
+      const line = new atlas.data.LineString(path);
+      window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'LineString created'}}));
+      const feature = new atlas.data.Feature(line);
+      window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Feature created'}}));
       const dataSource = new atlas.source.DataSource();
       map.sources.add(dataSource);
-      dataSource.add(new atlas.data.Feature(new atlas.data.LineString(path)));
+      window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'DataSource added'}}));
+      dataSource.add(feature);
+      window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Feature added to DataSource'}}));
 
       const lineLayer = new atlas.layer.LineLayer(dataSource, null, {
         strokeColor: 'blue',
         strokeWidth: 4
       });
       map.layers.add(lineLayer);
-      routeLine = dataSource;
-    }
+      summaryLineSource = dataSource;
+      window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'LineLayer added'}}));
 
-    function centerMap(path) {
-      if (map && path && path.length > 0) {
+      // Fit map to path bounds
+      if (path.length > 1) {
+        // Compute bounding box
+        const bbox = atlas.data.BoundingBox.fromData(line);
+        window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Bounding box: ' + JSON.stringify(bbox)}}));
+        map.setCamera({
+          bounds: bbox,
+          padding: 40,
+        });
+        window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Camera set to bounds'}}));
+      } else {
+        // Only one point, just center and zoom
         map.setCamera({
           center: path[0],
-          zoom: 15
+          zoom: 20
         });
+        window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Camera set to single point'}}));
       }
     }
+    window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Checking for messages'}}));
 
+    // Listen for messages from React Native
     window.addEventListener('message', function(event) {
+      console.log('Received message in WebView:', event.data);
+      window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Received message in WebView: '+event.data}}));
       try {
         const data = JSON.parse(event.data);
+        console.log('Parsed message data:', data);
         if (data.path) {
-          drawRoute(data.path);
-          centerMap(data.path);
+          console.log('Path received, drawing path...');
+          if (mapIsReady) {
+            drawPath({ path: data.path });
+          } else {
+            pendingTrack = { path: data.path };
+          }
         }
       } catch (e) {
-        // ignore
+        console.error('Error parsing message:', e);
+        console.error('Raw message data:', event.data);
       }
     });
 
-    function initMap() {
-      map = new atlas.Map('map', {
-        center: [34.8, 32.1],
-        zoom: 10,
-        view: 'Auto',
-        authOptions: {
-          authType: 'subscriptionKey',
-          subscriptionKey: 'YOUR_AZURE_MAPS_KEY'
-        }
-      });
-    }
+    // Initialize map when page loads
     window.onload = initMap;
   </script>
 </body>

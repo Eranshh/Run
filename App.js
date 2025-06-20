@@ -20,45 +20,6 @@ import RunSummaryScreen from './RunSummaryScreen';
 
 const Stack = createNativeStackNavigator();
 
-const API_TIMEOUT = 15000; // 15 seconds
-const MAX_RETRIES = 3;
-
-const fetchWithRetry = async (url, options = {}) => {
-  let lastError;
-  
-  for (let i = 0; i < MAX_RETRIES; i++) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
-      
-      const response = await fetch(url, {
-        ...options,
-        signal: controller.signal,
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      lastError = error;
-      if (error.name === 'AbortError') {
-        console.log(`Request timeout, attempt ${i + 1} of ${MAX_RETRIES}`);
-      } else {
-        console.log(`Request failed, attempt ${i + 1} of ${MAX_RETRIES}:`, error);
-      }
-      if (i < MAX_RETRIES - 1) {
-        // Wait before retrying (exponential backoff)
-        await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
-      }
-    }
-  }
-  
-  throw lastError;
-};
 
 function MainScreen({ navigation, username, userId, userToken }) {
   const [userType, setUserType] = useState(null);
@@ -301,7 +262,8 @@ function MainScreen({ navigation, username, userId, userToken }) {
 
   const getAllOpenEvents = async () => {
     try {
-      const data = await fetchWithRetry('https://runfuncionapp.azurewebsites.net/api/getAllOpenEvents');
+      const response = await fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/getAllOpenEvents');
+      const data = await response.json();
       console.log('Got Events:', data);
       eventList.events = data.map((event) => ({
         latitude: event.latitude,
@@ -353,9 +315,10 @@ function MainScreen({ navigation, username, userId, userToken }) {
 
 const getAllTracks = async () => {
     try {
-      const data = await fetchWithRetry('https://runfuncionapp.azurewebsites.net/api/getAllTracks');
+      const response = await fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/getAllTracks');
+      const data = await response.json();
       console.log('Got Tracks:', data);
-      console.log('first point:', data[0].path[0]);
+      //console.log('first point:', data[0].path[0]);
       const trackIds = data.map(track => track.trackId);
       setTracks(trackIds);
       webViewRef.current.postMessage(JSON.stringify({'type': "tracks", 'tracks': data}));
@@ -388,7 +351,11 @@ const getAllTracks = async () => {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({path: track})
+          body: JSON.stringify({
+            path: track,
+            userId: userId,
+            timestamp: new Date().toISOString()
+          })
         }
       );
       console.log('createTrack response status:', response.status);

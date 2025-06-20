@@ -65,7 +65,13 @@ export default function UserProfileScreen({ navigation, username, userId, onLogo
   };
 
   const handleRunPress = (run) => {
+    console.log('handleRunPress called with run:', run);
+    console.log('userTracks:', userTracks);
+    console.log('Looking for trackId:', run.trackId);
+    
     const track = userTracks.find(t => t.trackId === run.trackId);
+    console.log('Found track:', track);
+    
     navigation.navigate('RunSummary', { run, track });
   };
 
@@ -98,13 +104,27 @@ export default function UserProfileScreen({ navigation, username, userId, onLogo
         const response = await fetchWithAuth(
           `https://runfuncionapp.azurewebsites.net/api/getUsersTracks?userId=${encodeURIComponent(userId)}`
         );
-        console.log('Got response:', response);
-        const data = await response.json();
+        console.log('getUsersTracks response status:', response.status);
+        
         if(!response.ok) {
           throw new Error('Failed to fetch tracks');
         }
-        console.log('Got data:', data);
-        setUserTracks(data);
+        
+        const data = await response.json();
+        console.log('getUsersTracks raw data:', data);
+        console.log('Number of tracks received:', data.length);
+        
+        // Log each track to see the structure
+        data.forEach((track, index) => {
+          console.log(`Track ${index}:`, track);
+        });
+        
+        const tracks = data.map(track => ({
+          ...track,
+          path: typeof track.path === 'string' ? JSON.parse(track.path) : track.path,
+        }));
+        
+        setUserTracks(tracks);
       } catch (error) {
         console.error('Error fetching tracks:', error);
       }
