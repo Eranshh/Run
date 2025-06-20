@@ -17,7 +17,8 @@
     let summaryStartMarker = null;
     let mapIsReady = false;
     let pendingTrack = null;
-    
+    window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Inside runSummaryMap.html'}}));
+
     function initMap() {
       console.log('Initializing map...');
       map = new atlas.Map('map', {
@@ -59,6 +60,11 @@
         map.markers.remove(summaryStartMarker);
         summaryStartMarker = null;
       }
+      // Remove previous finish marker if exists
+      if (window.summaryFinishMarker) {
+        map.markers.remove(window.summaryFinishMarker);
+        window.summaryFinishMarker = null;
+      }
 
       // Add start marker
       window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Adding start marker at: ' + JSON.stringify(path[0])}}));
@@ -70,6 +76,19 @@
       map.markers.add(startMarker);
       summaryStartMarker = startMarker;
       window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Start marker added'}}));
+
+      // Add finish marker if path has more than one point
+      if (path.length > 1) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Adding finish marker at: ' + JSON.stringify(path[path.length-1])}}));
+        const finishMarker = new atlas.HtmlMarker({
+          position: path[path.length-1],
+          text: 'F',
+          color: 'red'
+        });
+        map.markers.add(finishMarker);
+        window.summaryFinishMarker = finishMarker;
+        window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Finish marker added'}}));
+      }
 
       // Draw the path
       window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Creating LineString'}}));
@@ -113,7 +132,7 @@
     window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Checking for messages'}}));
 
     // Listen for messages from React Native
-    window.addEventListener('message', function(event) {
+    window.document.addEventListener('message', function(event) {
       console.log('Received message in WebView:', event.data);
       window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Received message in WebView: '+event.data}}));
       try {

@@ -49,16 +49,16 @@ export default function RunSummaryScreen({ route }) {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{run.name || 'Run Summary'}</Text>
-      <Text>Date: {new Date(run.date).toLocaleString()}</Text>
-      <Text>Distance: {(run.distance / 1000).toFixed(2)} km</Text>
-      <Text>Duration: {Math.floor(run.duration / 60)} min</Text>
-      <Text>Pace: {run.averagePace?.toFixed(2) || 'N/A'} min/km</Text>
-      <Text>Speed: {run.averageSpeed?.toFixed(1) || 'N/A'} km/h</Text>
-      <Text>Calories: {run.calories?.toFixed(0) || 'N/A'}</Text>
-      <Text>Type: {run.type}</Text>
-      <Text>Route: {run.route}</Text>
-      <Text>Track ID: {run.trackId}</Text>
-      
+      <View style={styles.statsCard}>
+        <View style={styles.statRow}><Text style={styles.statLabel}>📅 Date:</Text><Text style={styles.statValue}>{new Date(run.date).toLocaleString()}</Text></View>
+        <View style={styles.statRow}><Text style={styles.statLabel}>📏 Distance:</Text><Text style={styles.statValue}>{(run.distance / 1000).toFixed(2)} km</Text></View>
+        <View style={styles.statRow}><Text style={styles.statLabel}>⏱️ Duration:</Text><Text style={styles.statValue}>{Math.floor(run.duration / 60)} min</Text></View>
+        <View style={styles.statRow}><Text style={styles.statLabel}>🏃 Pace:</Text><Text style={styles.statValue}>{run.averagePace?.toFixed(2) || 'N/A'} min/km</Text></View>
+        <View style={styles.statRow}><Text style={styles.statLabel}>🚀 Speed:</Text><Text style={styles.statValue}>{run.averageSpeed?.toFixed(1) || 'N/A'} km/h</Text></View>
+        <View style={styles.statRow}><Text style={styles.statLabel}>🔥 Calories:</Text><Text style={styles.statValue}>{run.calories?.toFixed(0) || 'N/A'}</Text></View>
+        <View style={styles.statRow}><Text style={styles.statLabel}>🏷️ Type:</Text><Text style={styles.statValue}>{run.type}</Text></View>
+        <View style={styles.statRow}><Text style={styles.statLabel}>🗺️ Route:</Text><Text style={styles.statValue}>{run.route}</Text></View>
+      </View>
       {track && track.path ? (
         <WebView
           ref={webViewRef}
@@ -90,7 +90,36 @@ export default function RunSummaryScreen({ route }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#fff' },
-  title: { fontSize: 22, fontWeight: 'bold', marginBottom: 10 },
+  title: { fontSize: 22, fontWeight: 'bold', marginBottom: 10, alignSelf: 'center' },
+  statsCard: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 14,
+    padding: 18,
+    marginBottom: 18,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  statRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  statLabel: {
+    fontWeight: 'bold',
+    fontSize: 16,
+    color: '#333',
+    marginRight: 8,
+  },
+  statValue: {
+    fontSize: 16,
+    color: '#007AFF',
+    flexShrink: 1,
+    textAlign: 'right',
+  },
   map: {
     width: Dimensions.get('window').width - 32,
     height: 250,
