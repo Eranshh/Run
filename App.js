@@ -17,6 +17,7 @@ import { ConsoleLogger } from '@microsoft/signalr/dist/esm/Utils';
 import UserProfileScreen from './UserProfileScreen';
 import { fetchWithAuth } from './utils/api';
 import RunSummaryScreen from './RunSummaryScreen';
+import SelectTrackScreen from './SelectTrackScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -434,8 +435,8 @@ const getAllTracks = async () => {
     setIsEventDisplayVisible(true);
   }
 
-  function startFreeRun() {
-    webViewRef.current.postMessage(JSON.stringify({ type: 'startFreeRun' }));
+  function navigateToSelectTrack() {
+    navigation.navigate('SelectTrack');
   }
 
   // Listen for messages from the map:
@@ -537,7 +538,7 @@ const getAllTracks = async () => {
           </TouchableOpacity>
         )}
         {mode === "mainMap" && (
-          <TouchableOpacity id="startFreeRunBtn" style={styles.freeRunBtn} onPress={startFreeRun}>
+          <TouchableOpacity id="startFreeRunBtn" style={styles.freeRunBtn} onPress={navigateToSelectTrack}>
             <Text style={styles.fabText}>🏃</Text>
           </TouchableOpacity>
         )}
@@ -781,6 +782,27 @@ export default function App() {
             >
               {props => (
                 <RunSummaryScreen 
+                  {...props}
+                  username={username}
+                  userId={userId}
+                />
+              )}
+            </Stack.Screen>
+            <Stack.Screen 
+              name="SelectTrack" 
+              options={{ 
+                title: 'Select Track',
+                headerStyle: {
+                  backgroundColor: '#007AFF',
+                },
+                headerTintColor: '#fff',
+                headerTitleStyle: {
+                  fontWeight: 'bold',
+                },
+              }}
+            >
+              {props => (
+                <SelectTrackScreen 
                   {...props}
                   username={username}
                   userId={userId}
