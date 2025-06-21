@@ -22,7 +22,7 @@ import SelectTrackScreen from './SelectTrackScreen';
 const Stack = createNativeStackNavigator();
 
 
-function MainScreen({ navigation, username, userId, userToken }) {
+function MainScreen({ navigation, username, userId, userToken, route }) {
   const [userType, setUserType] = useState(null);
   const [connection, setConnection] = useState(null);
   const [isSheetVisible, setIsSheetVisible] = useState(false);
@@ -37,12 +37,40 @@ function MainScreen({ navigation, username, userId, userToken }) {
   const webViewRef = useRef(null);
   const eventDisplayRef = useRef(null);
   const sheetRef = useRef(null);
+  const hasHandledParams = useRef(false);
 
   // Handle events:
   var eventList = {
     type: 'eventList',
     events: []
   };
+
+  // Handle route parameters for track selection
+  useEffect(() => {
+    if (route?.params && !hasHandledParams.current && mapReady) {
+      const { mode: routeMode, selectedTrack: routeSelectedTrack } = route.params;
+      
+      if (routeMode === 'freeRun') {
+        // Start free run
+        console.log('Starting free run from route params');
+        webViewRef.current?.postMessage(JSON.stringify({ type: 'startFreeRun' }));
+      } else if (routeMode === 'guidedRun' && routeSelectedTrack) {
+        // Handle guided run with selected track
+        console.log('Starting guided run with track:', routeSelectedTrack);
+        setSelectedTrack(routeSelectedTrack);
+        // You can add logic here to display the selected track on the map
+        // For now, just set the selected track
+      }
+      
+      // Mark as handled to prevent re-triggering
+      hasHandledParams.current = true;
+    }
+  }, [route?.params, mapReady]);
+
+  // Reset the flag when route params change
+  useEffect(() => {
+    hasHandledParams.current = false;
+  }, [route?.params]);
 
   useEffect(() => {
     const connectToSignalR = async () => {
