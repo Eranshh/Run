@@ -1,10 +1,10 @@
 // CreateEventSheet.js
-import React, { useMemo, useState,useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { View, FlatList, Text, Button, StyleSheet } from 'react-native';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 
-const CreateEventDisplay = React.forwardRef(({ eventObject, joinEvent, deleteEvent, userId }, ref) => {
-  const snapPoints = useMemo(() => ['25%', '50%'], []);
+const CreateEventDisplay = React.forwardRef(({ eventObject, joinEvent, deleteEvent, leaveEvent, userId, onStartEvent, onMarkReady, onStartEventNow }, ref) => {
+  const snapPoints = useMemo(() => ['25%', '75%'], []); // Increased height for more content
 
   const [eventTitle, setTitle] = useState('Some Event');
   const [selectedEventId, setSelectedEventId] = useState(null);
@@ -14,6 +14,7 @@ const CreateEventDisplay = React.forwardRef(({ eventObject, joinEvent, deleteEve
   const [difficulty, setDifficulty] = useState(null);
   const [startTime, setStartTime] = useState(null);
   const [users, setUsers] = useState([]);
+  const [readyUsers, setReadyUsers] = useState([]); // New state for ready users
 
   useEffect(() => {
     if (eventObject) {
@@ -25,6 +26,7 @@ const CreateEventDisplay = React.forwardRef(({ eventObject, joinEvent, deleteEve
       if (eventObject.difficulty) setDifficulty(eventObject.difficulty);
       if (eventObject.startTime) setStartTime(eventObject.startTime);
       if (eventObject.usersList) setUsers(eventObject.usersList);
+      if (eventObject.readyUsers) setReadyUsers(eventObject.readyUsers);
     }
   }, [eventObject]);
 
@@ -36,6 +38,28 @@ const CreateEventDisplay = React.forwardRef(({ eventObject, joinEvent, deleteEve
     deleteEvent(selectedEventId);
     ref.current?.close();
   }
+
+  const handleLeaveEvent = () => {
+    leaveEvent(selectedEventId, userId, userId);
+    ref.current?.close();
+  }
+
+  const handleStartEvent = () => {
+    onStartEvent(selectedEventId);
+  }
+
+  const handleMarkReady = () => {
+    onMarkReady(selectedEventId);
+  }
+
+  const handleStartEventNow = () => {
+    onStartEventNow(selectedEventId);
+  }
+
+  const isHost = userId === host;
+  const isParticipant = users.some(user => user.userId === userId);
+  const isReadyMode = status === 'ready';
+  const isUserReady = readyUsers.includes(userId);
 
   return (
     <BottomSheet
@@ -61,22 +85,71 @@ const CreateEventDisplay = React.forwardRef(({ eventObject, joinEvent, deleteEve
           <Text style={styles.label}>Registered Users:</Text>
           <FlatList
             data={users}
-            renderItem={({item}) => <Text style={styles.userItem}>{item.FirstName} {item.LastName}</Text>}
+            renderItem={({item}) => (
+              <View style={styles.userRow}>
+                <Text style={styles.userItem}>
+                  {item.userId}
+                </Text>
+                {isReadyMode && readyUsers.includes(item.userId) && (
+                  <Text style={styles.readyBadge}>Ready</Text>
+                )}
+              </View>
+            )}
+            keyExtractor={(item, idx) => item.userId || item.userId || item.RowKey || String(idx)}
           />
         </View>
 
         <View style={styles.buttonContainer}>
+          {!isParticipant && !isHost && (
+            <Button
+              title="Join"
+              onPress={handleJoin}
+            />
+          )}
+          
+          {isParticipant && !isHost && (
+            <Button
+              title="Leave Event"
+              onPress={handleLeaveEvent}
+              color="#dc3545"
+            />
+          )}
+
+          {isHost && status === 'open' && (
+            <Button
+              title="Start Event Preparation"
+              onPress={handleStartEvent}
+              color="#28a745"
+            />
+          )}
+
+          {isHost && status === 'ready' && (
+            <Button
+              title="Start Event Now"
+              onPress={handleStartEventNow}
+              color="#007bff"
+            />
+          )}
+
+          {isParticipant && isReadyMode && !isUserReady && (
+            <Button
+              title="Mark as Ready"
+              onPress={handleMarkReady}
+              color="#007bff"
+            />
+          )}
+
+          {isHost && (
+            <Button
+              title="Delete"
+              onPress={handleDelete}
+              color="#dc3545"
+            />
+          )}
+
           <Button
-            title="Join"
-            onPress={handleJoin}
-          />
-          <Button
-            title="Delete"
-            onPress={handleDelete}
-          />
-          <Button
-              title="Close"
-              onPress={() =>ref.current?.close()}
+            title="Close"
+            onPress={() => ref.current?.close()}
           />
         </View>
       </BottomSheetView>
@@ -86,35 +159,12 @@ const CreateEventDisplay = React.forwardRef(({ eventObject, joinEvent, deleteEve
 
 export default CreateEventDisplay;
 
-// const styles = StyleSheet.create({
-//   container: {
-//     flex: 1,
-//     padding: 20,
-//     gap: 10,
-//   },
-//   title: {
-//     fontSize: 20,
-//     marginBottom: 10,
-//     fontWeight: 'bold',
-//   },
-//   input: {
-//     borderWidth: 1,
-//     borderColor: '#ccc',
-//     borderRadius: 8,
-//     padding: 10,
-//   },
-//   picker: {
-//     height: 50,
-//     width: '100%',
-//   },
-// });
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
     gap: 12,
-    backgroundColor: '#fff', // Optional for clarity
+    backgroundColor: '#fff',
   },
   title: {
     fontSize: 22,
@@ -134,13 +184,27 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   userList: {
-    maxHeight: 150,
+    maxHeight: 200,
     marginVertical: 10,
+  },
+  userRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
   },
   userItem: {
     fontSize: 15,
     color: '#444',
+  },
+  readyBadge: {
+    fontSize: 12,
+    color: '#28a745',
+    fontWeight: 'bold',
+    backgroundColor: '#e8f5e9',
+    paddingHorizontal: 8,
     paddingVertical: 2,
+    borderRadius: 12,
   },
   buttonContainer: {
     marginTop: 10,

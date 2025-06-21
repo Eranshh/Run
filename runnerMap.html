@@ -24,8 +24,38 @@
             z-index: 1000;
             box-shadow: 0 4px 8px rgba(0,0,0,0.3);
         }
+        #stopEventRunBtn  {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            font-size: 32px;
+            background-color: red;
+            color: white;
+            border: none;
+            cursor: pointer;
+            z-index: 1000;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
 
         #pauseFreeRunBtn  {
+            position: fixed;
+            bottom: 20px;
+            left: 100px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            font-size: 32px;
+            background-color: orange;
+            color: white;
+            border: none;
+            cursor: pointer;
+            z-index: 1000;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        #pauseEventRunBtn  {
             position: fixed;
             bottom: 20px;
             left: 100px;
@@ -273,7 +303,15 @@
     <script>
         let map;
         let freeRunActive = false;
+        let eventRunActive = false;
         let currentUser = null;
+        let currentUserId = null; // Add userId for proper filtering
+        let currentEventRun = null;
+        let eventRunners = new Map(); // Map of userId -> runner data
+        let eventRunnerMarkers = new Map(); // Map of userId -> marker
+        let eventRunnerPaths = new Map(); // Map of userId -> path data source
+        let eventTrackId = null;
+        let eventTrackLayer = null;
 
         function getMap() {
             map = new atlas.Map('myMap', {
@@ -293,20 +331,20 @@
                 window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'getEvents'}}));
                 window.document.addEventListener('message', function(event) {
                     try {
-                        window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: event.data}}));
                         const data = JSON.parse(event.data);
                         const type  = data.type || {};
-                        window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: type}}));
                         if (type === 'eventList') {
                             // Handle event list
-                            console.log('Received event list:', data.data);
                             window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Received event list'}}));
                             const events  = data.events || [];
 
-                            // Clear existing markers
-                            if (!window.eventMarkers) {
-                                window.eventMarkers = [];
+                            // --- ROBUST MARKER HANDLING ---
+                            // 1. Clear all existing event markers from the map and our tracking array
+                            if (window.eventMarkers && window.eventMarkers.length > 0) {
+                                map.markers.remove(window.eventMarkers);
                             }
+                                window.eventMarkers = [];
+                            // --- END ROBUST HANDLING ---
 
                             // Store my events
                             if (!window.myEvents) {
@@ -323,6 +361,9 @@
                                     position: [longitude, latitude],
                                     text: '!'
                                 });
+                                
+                                // Store eventId on the marker object itself
+                                marker.eventId = id;
 
                                 map.markers.add(marker);
                                 window.eventMarkers.push(marker);
@@ -353,8 +394,12 @@
                         }
                         else if (type === 'userLocation') {
                             const { location } = data;
-                            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'updating location: ' + JSON.stringify(location.coords)}}));
+                            
+                            if (freeRunActive) {
                             freeRunLoc(location);
+                            } else if (eventRunActive) {
+                                eventRunLoc(location);
+                            }
 
                             if (!window.userMarker) {
                                 window.userMarker = new atlas.HtmlMarker({
@@ -392,6 +437,27 @@
 
                         }else if (type === 'startFreeRun') {
                             startFreeRun();
+                        }else if (type === 'startEventRun') {
+                            startEventRun(data.data);
+                        }else if (type === 'updateEventRunners') {
+                            updateEventRunners(data.data);
+                        }else if (type === 'updateRunnerPosition') {
+                            updateRunnerPosition(data.data);
+                        }else if (type === 'removeRunner') {
+                            removeRunner(data.data.userId);
+                        }else if (type === 'endEventRun') {
+                            // Clear event run state
+                            eventRunActive = false;
+                            currentEventRun = null;
+                            eventRunners.clear();
+                            eventRunnerMarkers.forEach(marker => {
+                                map.markers.remove(marker);
+                            });
+                            eventRunnerMarkers.clear();
+                            eventRunnerPaths.forEach(dataSource => {
+                                map.sources.remove(dataSource);
+                            });
+                            eventRunnerPaths.clear();
                         }else if (type === 'log') {
                             console.log('Log from WebView:', data.message);
                         }else {
@@ -825,6 +891,8 @@
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('pauseFreeRunBtn').onclick = pauseFreeRun;
             document.getElementById('stopFreeRunBtn').onclick = stopFreeRun;
+            document.getElementById('pauseEventRunBtn').onclick = pauseEventRun;
+            document.getElementById('stopEventRunBtn').onclick = stopEventRun;
         });
 
         function updateRunTimer() {
@@ -844,12 +912,266 @@
 
         // free run ends here
 
+        // Event Run functionality
+        let eventRunPaused = false;
+        let eventRunPath = [];
+        let eventRunStartTime = null;
+        let eventRunPolylineSource = null;
+        let eventRunDataSource = null;
+        let eventRunTimerInterval = null;
+        let eventRunTotalPausedTime = 0;
+        let eventRunPauseStartTime = null;
+        let eventRunTotalTime = 0;
+
+        function startEventRun(eventData) {
+            const overlay = document.getElementById('countdownOverlay');
+            const text = document.getElementById('countdownText');
+            overlay.style.display = 'flex';
+            let count = 3;
+
+            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'enterEventRunMode'}}))
+
+            text.textContent = count;
+            const countdownInterval = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    text.textContent = count;
+                } else {
+                    clearInterval(countdownInterval);
+                    overlay.style.display = 'none';
+
+                    eventRunActive = true;
+                    eventRunPaused = false;
+                    eventRunPath = [];
+                    eventRunStartTime = Date.now();
+                    eventRunTotalPausedTime = 0;
+                    eventRunTotalTime = 0;
+                    currentEventRun = eventData;
+
+                    window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Event run started'}}));
+                    console.log('Event run started at', new Date(eventRunStartTime).toLocaleString());
+
+                    updateEventRunTimer(); // Immediately update UI
+                    eventRunTimerInterval = setInterval(updateEventRunTimer, 1000);
+
+                    document.getElementById('pauseEventRunBtn').style.display = 'inline';
+                    document.getElementById('stopEventRunBtn').style.display = 'inline';
+                    document.getElementById('eventRunStats').style.display = 'block';
+
+                    if (!eventRunDataSource) {
+                        eventRunDataSource = new atlas.source.DataSource();
+                        map.sources.add(eventRunDataSource);
+                        map.layers.add(new atlas.layer.LineLayer(eventRunDataSource, null, {
+                            strokeColor: 'blue',
+                            strokeWidth: 3
+                        }));
+                    }
+
+                    // Show event track if it exists
+                    if (eventData.trackId) {
+                        showEventTrack(eventData.trackId);
+                    }
+
+                    window.eventMarkers.forEach(marker => {
+                        marker.setOptions({ visible: false }); // Hide event markers
+                    });
+                }
+            }, 1000);
+        }
+
+        function eventRunLoc(location) {
+            if (!eventRunActive || eventRunPaused) return;
+            
+            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Event run location updated with coords: ' + JSON.stringify(location.coords)}}));
+            const { latitude, longitude, speed, heading } = location.coords;
+            const point = [longitude, latitude];
+            
+            eventRunPath.push(point);
+            map.setCamera({ center: point, zoom: 20, bearing: heading ?? 0, pitch: 60 });
+
+            const line = new atlas.data.LineString(eventRunPath);
+            eventRunDataSource.setShapes([new atlas.data.Feature(line)]);
+
+            const distance = calculateTotalDistance(eventRunPath);
+            const elapsed = (Date.now() - eventRunStartTime) / 1000;
+            const pace = distance > 0 ? (elapsed / 60) / (distance / 1000) : 0;
+            const cal = estimateCalories(distance);
+            const spd = speed ? (speed * 3.6).toFixed(1) : '0';
+
+            document.getElementById('eventRunSpeed').textContent = spd;
+            document.getElementById('eventRunDistance').textContent = distance.toFixed(1);
+            document.getElementById('eventRunPace').textContent = pace.toFixed(2);
+            document.getElementById('eventRunCalories').textContent = cal.toFixed(0);
+
+            // Send position update to backend
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+                data: {
+                    action: 'updateEventPosition',
+                    location: location
+                }
+            }));
+        }
+
+        function pauseEventRun() {
+            eventRunPaused = !eventRunPaused;
+            document.getElementById('pauseEventRunBtn').textContent = eventRunPaused ? '▶️' : '⏸️';
+            if(eventRunPaused) {
+                eventRunPauseStartTime = new Date();
+            } else {
+                const now = new Date();
+                eventRunTotalPausedTime += now - eventRunPauseStartTime;
+                eventRunPauseStartTime = null;
+            }
+        }
+
+        function stopEventRun() {
+            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'entering stop event run'}}));
+            eventRunActive = false;
+
+            document.getElementById('pauseEventRunBtn').style.display = 'none';
+            document.getElementById('stopEventRunBtn').style.display = 'none';
+            document.getElementById('eventRunStats').style.display = 'none';
+
+            console.log('Event run complete. Total path:', eventRunPath);
+            if (eventRunTimerInterval) {
+                clearInterval(eventRunTimerInterval);
+                eventRunTimerInterval = null;
+            }
+
+            window.eventMarkers.forEach(marker => {
+                marker.setOptions({ visible: true }); // Show event markers
+            });
+            map.setCamera({ zoom: 15, bearing: 0, pitch: 0 });
+
+            const totalDistance = calculateTotalDistance(eventRunPath);
+            
+            // Display summary
+            document.getElementById('eventRunStats').style.display = 'none';
+            document.getElementById('eventRunSummary').style.display = 'block';
+            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'showing event run summary menu'}}));
+
+            // Set stats
+            document.getElementById('eventSummaryTime').textContent = document.getElementById('eventRunTime').textContent;
+            document.getElementById('eventSummaryDistance').textContent = totalDistance.toFixed(1);
+            document.getElementById('eventSummaryCalories').textContent = estimateCalories(totalDistance);
+
+            const pace = totalDistance > 0 ? (eventRunTotalTime / 60) / (totalDistance / 1000) : 0;
+            document.getElementById('eventSummaryPace').textContent = pace.toFixed(2);
+
+            // Send run data to backend
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+                data: {
+                    action: 'endEventRun',
+                    runData: {
+                        distance: totalDistance,
+                        duration: eventRunTotalTime,
+                        calories: estimateCalories(totalDistance),
+                        pace: pace,
+                        speed: totalDistance > 0 ? (totalDistance / 1000) / (eventRunTotalTime / 3600) : 0,
+                        path: eventRunPath
+                    }
+                }
+            }));
+
+            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'leaveEventRunMode'}}));
+        }
+
+        function updateEventRunTimer() {
+            if (!eventRunStartTime || eventRunPaused) return;
+            const now = new Date();
+            const elapsed = Math.floor((now - eventRunStartTime - eventRunTotalPausedTime) / 1000); // in seconds
+
+            eventRunTotalTime = elapsed; // Update total run time
+
+            const hours = String(Math.floor(elapsed / 3600)).padStart(2, '0');
+            const minutes = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
+            const seconds = String(elapsed % 60).padStart(2, '0');
+
+            document.getElementById('eventRunTime').textContent = `${hours}:${minutes}:${seconds}`;
+        }
+
+        function closeEventRunSummary() {
+            document.getElementById('eventRunSummary').style.display = 'none';
+        }
+
+        function showEventTrack(trackId) {
+            // This would load and display the track for the event
+            // Implementation depends on how tracks are stored and retrieved
+            console.log('Showing event track:', trackId);
+        }
+
+        function updateEventRunners(runners) {
+            // Clear existing runners
+            eventRunnerMarkers.forEach(marker => {
+                map.markers.remove(marker);
+            });
+            eventRunnerMarkers.clear();
+            eventRunnerPaths.forEach(dataSource => {
+                map.sources.remove(dataSource);
+            });
+            eventRunnerPaths.clear();
+
+            // Add new runners
+            runners.forEach(runner => {
+                if (runner.userId !== currentUserId) { // Use userId for filtering
+                    const marker = new atlas.HtmlMarker({
+                        position: [runner.longitude, runner.latitude],
+                        text: '🏃',
+                        color: 'red'
+                    });
+                    eventRunnerMarkers.set(runner.userId, marker);
+                    map.markers.add(marker);
+                }
+            });
+        }
+
+        function updateRunnerPosition(positionData) {
+            if (positionData.userId === currentUserId) return; // Use userId for filtering
+
+            let marker = eventRunnerMarkers.get(positionData.userId);
+            if (!marker) {
+                // Create new marker for this runner
+                marker = new atlas.HtmlMarker({
+                    position: [positionData.longitude, positionData.latitude],
+                    text: '🏃',
+                    color: 'red'
+                });
+                eventRunnerMarkers.set(positionData.userId, marker);
+                map.markers.add(marker);
+            } else {
+                // Update existing marker
+                marker.setOptions({
+                    position: [positionData.longitude, positionData.latitude]
+                });
+            }
+        }
+
+        function removeRunner(userId) {
+            console.log('Removing runner:', userId);
+            const marker = eventRunnerMarkers.get(userId);
+            if (marker) {
+                map.markers.remove(marker);
+                eventRunnerMarkers.delete(userId);
+            }
+            
+            // Also remove from local runners state if we have it
+            if (window.ReactNativeWebView) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                    data: {
+                        action: 'removeRunner',
+                        userId: userId
+                    }
+                }));
+            }
+        }
+
         // Add a function to receive the username from React Native
         window.addEventListener('message', function(event) {
             try {
                 const data = JSON.parse(event.data);
                 if (data.type === 'userIdentity') {
                     currentUser = data.username;
+                    currentUserId = data.userId; // Store userId for filtering
                     // Update username display
                     const userElements = document.getElementsByClassName('current-user');
                     for (let element of userElements) {
@@ -909,6 +1231,11 @@
   <button id="stopFreeRunBtn" style="display:none;">⏹</button>
 </div>
 
+<div id="eventRunControls" style="position: absolute; top: 10px; left: 10px; z-index: 1000;">
+  <button id="pauseEventRunBtn" style="display:none;">⏸️</button>
+  <button id="stopEventRunBtn" style="display:none;">⏹</button>
+</div>
+
 <div id="runStats" style="display: none; position: absolute; top: 10px; left: 10px; background: rgba(255,255,255,0.8); padding: 8px; border-radius: 8px; z-index: 1000;">
   <p>Time: <span id="runTime">00:00:00</span></p>
   <p>Speed: <span id="runSpeed">0</span> km/h</p>
@@ -917,6 +1244,13 @@
   <p>Calories: <span id="runCalories">0</span></p>
 </div>
 
+<div id="eventRunStats" style="display: none; position: absolute; top: 10px; right: 10px; background: rgba(255,255,255,0.8); padding: 8px; border-radius: 8px; z-index: 1000;">
+  <p>Time: <span id="eventRunTime">00:00:00</span></p>
+  <p>Speed: <span id="eventRunSpeed">0</span> km/h</p>
+  <p>Distance: <span id="eventRunDistance">0</span> m</p>
+  <p>Pace: <span id="eventRunPace">0</span> min/km</p>
+  <p>Calories: <span id="eventRunCalories">0</span></p>
+</div>
 
 <div id="runSummary" style="display: none; position: absolute; top: 10%; left: 5%; right: 5%; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 0 10px rgba(0,0,0,0.3); z-index: 1000;">
   <h2>Run Summary</h2>
@@ -926,6 +1260,16 @@
   <p><strong>Calories:</strong> <span id="summaryCalories">--</span></p>
   <div id="summaryMap" style="height: 200px; margin-top: 15px;"></div>
   <button onclick="closeRunSummary()">Close</button>
+</div>
+
+<div id="eventRunSummary" style="display: none; position: absolute; top: 10%; left: 5%; right: 5%; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 0 10px rgba(0,0,0,0.3); z-index: 1000;">
+  <h2>Event Run Summary</h2>
+  <p><strong>Time:</strong> <span id="eventSummaryTime">--</span></p>
+  <p><strong>Distance:</strong> <span id="eventSummaryDistance">--</span> m</p>
+  <p><strong>Avg Pace:</strong> <span id="eventSummaryPace">--</span> min/km</p>
+  <p><strong>Calories:</strong> <span id="eventSummaryCalories">--</span></p>
+  <div id="eventSummaryMap" style="height: 200px; margin-top: 15px;"></div>
+  <button onclick="closeEventRunSummary()">Close</button>
 </div>
 
 <div id="countdownOverlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); color: white; font-size: 64px; font-weight: bold; align-items: center; justify-content: center; z-index: 2000;">

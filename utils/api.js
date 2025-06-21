@@ -51,4 +51,79 @@ export const fetchWithAuth = async (url, options = {}) => {
       'Content-Type': 'application/json',
     },
   });
+};
+
+// New API functions for event ready status
+export const setEventReady = async (eventId) => {
+  return fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/setEventReady', {
+    method: 'POST',
+    body: JSON.stringify({ eventId }),
+  });
+};
+
+export const markUserReady = async (eventId, userId) => {
+  return fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/markUserReady', {
+    method: 'POST',
+    body: JSON.stringify({ eventId, userId }),
+  });
+};
+
+export const getEventReadyUsers = async (eventId) => {
+  return fetchWithAuth(
+    `https://runfuncionapp.azurewebsites.net/api/getEventReadyUsers?eventId=${encodeURIComponent(eventId)}`
+  );
+};
+
+export const startEvent = async (eventId, userId) => {
+  return fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/startEvent', {
+    method: 'POST',
+    body: JSON.stringify({ eventId, userId }),
+  });
+};
+
+export const updateRunnerPosition = async (eventId, userId, latitude, longitude, speed, heading, distance, elapsedTime) => {
+  return fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/updateRunnerPosition', {
+    method: 'POST',
+    body: JSON.stringify({ 
+      eventId, 
+      userId, 
+      latitude, 
+      longitude, 
+      speed, 
+      heading, 
+      distance, 
+      elapsedTime 
+    }),
+  });
+};
+
+export const getEventRunnersPositions = async (eventId) => {
+  return fetchWithAuth(`https://runfuncionapp.azurewebsites.net/api/getEventRunnersPositions?eventId=${encodeURIComponent(eventId)}`);
+};
+
+export const endEventRun = async (eventId, userId, totalDistance, totalDuration, totalCalories, averagePace, averageSpeed, path) => {
+  return fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/endEventRun', {
+    method: 'POST',
+    body: JSON.stringify({ 
+      eventId, 
+      userId, 
+      totalDistance, 
+      totalDuration, 
+      totalCalories, 
+      averagePace, 
+      averageSpeed, 
+      path 
+    }),
+  });
+};
+
+export const leaveEvent = async (eventId, leavingUserId, requestingUserId) => {
+  return fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/leaveEvent', {
+    method: 'POST',
+    body: JSON.stringify({ 
+      eventId, 
+      leavingUserId, 
+      requestingUserId 
+    }),
+  });
 }; 
