@@ -73,6 +73,12 @@ function MainScreen({ navigation, username, userId, userToken }) {
   const [currentEventRun, setCurrentEventRun] = useState(null); // New state for current event run
   const [eventRunners, setEventRunners] = useState([]); // New state for tracking all runners in event
 
+  // Add refs to always have latest state in event handlers
+  const modeRef = useRef(mode);
+  const currentEventRunRef = useRef(currentEventRun);
+  useEffect(() => { modeRef.current = mode; }, [mode]);
+  useEffect(() => { currentEventRunRef.current = currentEventRun; }, [currentEventRun]);
+
   const webViewRef = useRef(null);
   const eventDisplayRef = useRef(null);
   const sheetRef = useRef(null);
@@ -179,17 +185,17 @@ function MainScreen({ navigation, username, userId, userToken }) {
             console.log("SignalR: Received runnerPositionUpdate", positionData);
             console.log("Current user ID:", userId);
             console.log("Position data user ID:", positionData.userId);
-            console.log("Current mode:", mode);
-            console.log("Current event run:", currentEventRun);
+            console.log("Current mode:", modeRef.current);
+            console.log("Current event run:", currentEventRunRef.current);
             
             // Check if user is currently participating in an event run
-            if (mode !== "eventRun" || !currentEventRun) {
+            if (modeRef.current !== "eventRun" || !currentEventRunRef.current) {
               console.log("Ignoring position update - user not in event run mode");
               return;
             }
             
             // Check if the position update is for the current event
-            if (positionData.eventId !== currentEventRun.eventId) {
+            if (positionData.eventId !== currentEventRunRef.current.eventId) {
               console.log("Ignoring position update - not for current event");
               return;
             }
@@ -220,17 +226,17 @@ function MainScreen({ navigation, username, userId, userToken }) {
         signalrConnection.on("eventRunEnded", (runData) => {
           try {
             console.log("SignalR: Received eventRunEnded", runData);
-            console.log("Current mode:", mode);
-            console.log("Current event run:", currentEventRun);
+            console.log("Current mode:", modeRef.current);
+            console.log("Current event run:", currentEventRunRef.current);
             
             // Check if user is currently participating in an event run
-            if (mode !== "eventRun" || !currentEventRun) {
+            if (modeRef.current !== "eventRun" || !currentEventRunRef.current) {
               console.log("Ignoring event run ended - user not in event run mode");
               return;
             }
             
             // Check if the event end is for the current event
-            if (runData.eventId !== currentEventRun.eventId) {
+            if (runData.eventId !== currentEventRunRef.current.eventId) {
               console.log("Ignoring event run ended - not for current event");
               return;
             }
@@ -248,17 +254,17 @@ function MainScreen({ navigation, username, userId, userToken }) {
         signalrConnection.on("runnerRemoved", (removalData) => {
           try {
             console.log("SignalR: Received runnerRemoved", removalData);
-            console.log("Current mode:", mode);
-            console.log("Current event run:", currentEventRun);
+            console.log("Current mode:", modeRef.current);
+            console.log("Current event run:", currentEventRunRef.current);
             
             // Check if user is currently participating in an event run
-            if (mode !== "eventRun" || !currentEventRun) {
+            if (modeRef.current !== "eventRun" || !currentEventRunRef.current) {
               console.log("Ignoring runner removal - user not in event run mode");
               return;
             }
             
             // Check if the removal is for the current event
-            if (removalData.eventId !== currentEventRun.eventId) {
+            if (removalData.eventId !== currentEventRunRef.current.eventId) {
               console.log("Ignoring runner removal - not for current event");
               return;
             }

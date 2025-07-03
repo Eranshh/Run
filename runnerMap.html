@@ -312,6 +312,7 @@
         let eventRunnerPaths = new Map(); // Map of userId -> path data source
         let eventTrackId = null;
         let eventTrackLayer = null;
+        let eventTrackSource = null;
 
         function getMap() {
             map = new atlas.Map('myMap', {
@@ -421,6 +422,7 @@
                             const tracks  = data.tracks || [];
                             window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Received track list'}}));
                             window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: data.tracks}}));
+                            window.tracks = tracks; // Add this line
                             for (let i = 0; i < tracks.length; i++) {
                                 const { path, id } = tracks[i];
                                 if (!path || !Array.isArray(path) || path.length === 0) {
@@ -458,6 +460,25 @@
                                 map.sources.remove(dataSource);
                             });
                             eventRunnerPaths.clear();
+
+                            // Remove event track from map
+                            if (eventTrackLayer) {
+                                map.layers.remove(eventTrackLayer);
+                                eventTrackLayer = null;
+                            }
+                            if (eventTrackSource) {
+                                map.sources.remove(eventTrackSource);
+                                eventTrackSource = null;
+                            }
+                            // Remove the blue user-following track from the map
+                            if (eventRunDataSource) {
+                                map.sources.remove(eventRunDataSource);
+                                eventRunDataSource = null;
+                            }
+                            if (eventRunPolylineSource) {
+                                map.sources.remove(eventRunPolylineSource);
+                                eventRunPolylineSource = null;
+                            }
                         }else if (type === 'log') {
                             console.log('Log from WebView:', data.message);
                         }else {
@@ -809,9 +830,9 @@
             const distance = calculateTotalDistance(freeRunPath);
             const elapsed = (Date.now() - freeRunStartTime) / 1000;
             const pace = distance > 0 ? (elapsed / 60) / (distance / 1000) : 0;
-            const cal = estimateCalories(distance);
+            const cal = estimateCalories(distance, freeRunStartTime);
             const spd = speed ? (speed * 3.6).toFixed(1) : '0';
-
+            
             document.getElementById('runSpeed').textContent = spd;
             document.getElementById('runDistance').textContent = distance.toFixed(1);
             document.getElementById('runPace').textContent = pace.toFixed(2);
@@ -858,7 +879,7 @@
             // Set stats
             document.getElementById('summaryTime').textContent = document.getElementById('runTime').textContent;
             document.getElementById('summaryDistance').textContent = totalDistance.toFixed(1);
-            document.getElementById('summaryCalories').textContent = estimateCalories(totalDistance);
+            document.getElementById('summaryCalories').textContent = estimateCalories(totalDistance, freeRunStartTime);
 
             const pace = totalDistance > 0 ? (totalRunTime / 60) / (totalDistance / 1000) : 0;
             document.getElementById('summaryPace').textContent = pace.toFixed(2);
@@ -880,11 +901,11 @@
             return d;
         }
 
-        function estimateCalories(distanceMeters) {
+        function estimateCalories(distanceMeters, startTime) {
             const distanceKm = distanceMeters / 1000;
             const MET = 9.8;
             const weightKg = 70;
-            const hours = (Date.now() - freeRunStartTime) / (1000 * 60 * 60);
+            const hours = (Date.now() - startTime) / (1000 * 60 * 60);
             return MET * weightKg * hours;
         }
 
@@ -995,7 +1016,7 @@
             const distance = calculateTotalDistance(eventRunPath);
             const elapsed = (Date.now() - eventRunStartTime) / 1000;
             const pace = distance > 0 ? (elapsed / 60) / (distance / 1000) : 0;
-            const cal = estimateCalories(distance);
+            const cal = estimateCalories(distance, eventRunStartTime);
             const spd = speed ? (speed * 3.6).toFixed(1) : '0';
 
             document.getElementById('eventRunSpeed').textContent = spd;
@@ -1053,7 +1074,7 @@
             // Set stats
             document.getElementById('eventSummaryTime').textContent = document.getElementById('eventRunTime').textContent;
             document.getElementById('eventSummaryDistance').textContent = totalDistance.toFixed(1);
-            document.getElementById('eventSummaryCalories').textContent = estimateCalories(totalDistance);
+            document.getElementById('eventSummaryCalories').textContent = estimateCalories(totalDistance, eventRunStartTime);
 
             const pace = totalDistance > 0 ? (eventRunTotalTime / 60) / (totalDistance / 1000) : 0;
             document.getElementById('eventSummaryPace').textContent = pace.toFixed(2);
@@ -1065,7 +1086,7 @@
                     runData: {
                         distance: totalDistance,
                         duration: eventRunTotalTime,
-                        calories: estimateCalories(totalDistance),
+                        calories: estimateCalories(totalDistance, eventRunStartTime),
                         pace: pace,
                         speed: totalDistance > 0 ? (totalDistance / 1000) / (eventRunTotalTime / 3600) : 0,
                         path: eventRunPath
@@ -1093,11 +1114,39 @@
         function closeEventRunSummary() {
             document.getElementById('eventRunSummary').style.display = 'none';
         }
-
+        
         function showEventTrack(trackId) {
-            // This would load and display the track for the event
-            // Implementation depends on how tracks are stored and retrieved
-            console.log('Showing event track:', trackId);
+            if (!window.tracks) {
+                console.warn('No tracks loaded');
+                window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'No tracks loaded'}}));
+                return;
+            }
+            const track = window.tracks.find(t => t.trackId === trackId || t.id === trackId);
+            if (!track) {
+                console.warn('Track not found for id:', trackId);
+                window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Track not found for id: ' + trackId}}));
+                return;
+            }
+            if (window.tracks && track) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Track found for id: ' + trackId}}));
+            }
+
+            // Draw the new event track
+            let path = track.path || [];
+            eventTrackSource = new atlas.source.DataSource();
+            map.sources.add(eventTrackSource);
+
+            const line = new atlas.data.LineString(path);
+            const feature = new atlas.data.Feature(line);
+            eventTrackSource.add(feature);
+
+            eventTrackLayer = new atlas.layer.LineLayer(eventTrackSource, null, {
+                strokeColor: 'red',
+                strokeWidth: 10,
+                strokeOpacity: 0.6,
+                visible: true,
+            });
+            map.layers.add(eventTrackLayer);
         }
 
         function updateEventRunners(runners) {
