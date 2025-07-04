@@ -783,22 +783,57 @@
             });
             map.setCamera({ zoom: 15, bearing: 0, pitch: 0 });
 
+            // Remove the free run line from the map
+            if (freeRunDataSource) {
+                freeRunDataSource.setShapes([]);
+            }
+
             const totalDistance = calculateTotalDistance(freeRunPath);
             // Display summary
-            document.getElementById('runStats').style.display = 'none';
-            document.getElementById('runSummary').style.display = 'block';
-            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'showing run summary menu'}}));
+            // document.getElementById('runStats').style.display = 'none';
+            // document.getElementById('runSummary').style.display = 'block';
+            // window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'showing run summary menu'}}));
 
             // Set stats
-            document.getElementById('summaryTime').textContent = document.getElementById('runTime').textContent;
-            document.getElementById('summaryDistance').textContent = totalDistance.toFixed(1);
-            document.getElementById('summaryCalories').textContent = estimateCalories(totalDistance);
+            // document.getElementById('summaryTime').textContent = document.getElementById('runTime').textContent;
+            // document.getElementById('summaryDistance').textContent = totalDistance.toFixed(1);
+            // document.getElementById('summaryCalories').textContent = estimateCalories(totalDistance);
 
-            const pace = totalDistance > 0 ? (totalRunTime / 60) / (totalDistance / 1000) : 0;
-            document.getElementById('summaryPace').textContent = pace.toFixed(2);
+            // const pace = totalDistance > 0 ? (totalRunTime / 60) / (totalDistance / 1000) : 0;
+            // document.getElementById('summaryPace').textContent = pace.toFixed(2);
 
             window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'leaveFreeRunMode'}}));
             // drawSummaryRoute();
+
+            // Calculate stats
+            const duration = totalRunTime; // in seconds
+            const averageSpeed = totalDistance > 0 ? (totalDistance / duration) * 3.6 : 0; // km/h
+            const averagePace = totalDistance > 0 ? (duration / 60) / (totalDistance / 1000) : 0; // min/km
+            const calories = estimateCalories(totalDistance);
+
+            // Build activity object
+            const activity = {
+                userId: currentUser, // or get from storage/context
+                timestamp: new Date().toISOString(),
+                distance: totalDistance,
+                duration: duration,
+                averageSpeed: averageSpeed,
+                averagePace: averagePace,
+                calories: calories,
+                start_time: new Date(freeRunStartTime).toISOString(),
+                stop_time: new Date().toISOString(),
+                type: 'free run', // or other type
+                path: freeRunPath // if you want to store the path
+            };
+
+            createActivity(activity, freeRunPath);
+            // window.ReactNativeWebView.postMessage(JSON.stringify({
+            //     data: {
+            //         action: 'navigateToRunSummary',
+            //         run: activity,
+            //         track: { path: freeRunPath }
+            //     }
+            // }));
         }
 
         function closeRunSummary() {
@@ -888,6 +923,12 @@
                 data: {
                     action: 'navigateToProfile'
                 }
+            }));
+        }
+
+        function createActivity(activity, path) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+                data:{ action: 'logRun', activity: activity, track: {path: path}}
             }));
         }
 

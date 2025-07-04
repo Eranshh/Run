@@ -40,15 +40,16 @@ const fetchWithRetry = async (url, options = {}) => {
   throw lastError;
 };
 
-export const fetchWithAuth = async (url, options = {}) => {
+export async function fetchWithAuth(url, options = {}) {
   const token = await AsyncStorage.getItem('userToken');
-  console.log("this is token:", token);
-  return fetchWithRetry(url, {
+  const headers = {
+    ...(options.headers || {}),
+    Authorization: token ? `Bearer ${token}` : undefined,
+    'Content-Type': 'application/json',
+  };
+  const response = await fetch(url, {
     ...options,
-    headers: {
-      ...options.headers,
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
+    headers,
   });
-}; 
+  return response;
+}

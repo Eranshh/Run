@@ -16,50 +16,13 @@ import { get } from 'react-native/Libraries/TurboModule/TurboModuleRegistry';
 import { ConsoleLogger } from '@microsoft/signalr/dist/esm/Utils';
 import UserProfileScreen from './UserProfileScreen';
 import { fetchWithAuth } from './utils/api';
+import RunSummaryScreen from './RunSummaryScreen';
+import SelectTrackScreen from './SelectTrackScreen';
 
 const Stack = createNativeStackNavigator();
 
-const API_TIMEOUT = 15000; // 15 seconds
-const MAX_RETRIES = 3;
 
-const fetchWithRetry = async (url, options = {}) => {
-  let lastError;
-  
-  for (let i = 0; i < MAX_RETRIES; i++) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
-      
-      const response = await fetch(url, {
-        ...options,
-        signal: controller.signal,
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      lastError = error;
-      if (error.name === 'AbortError') {
-        console.log(`Request timeout, attempt ${i + 1} of ${MAX_RETRIES}`);
-      } else {
-        console.log(`Request failed, attempt ${i + 1} of ${MAX_RETRIES}:`, error);
-      }
-      if (i < MAX_RETRIES - 1) {
-        // Wait before retrying (exponential backoff)
-        await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
-      }
-    }
-  }
-  
-  throw lastError;
-};
-
-function MainScreen({ navigation, username, userId, userToken }) {
+function MainScreen({ navigation, username, userId, userToken, route }) {
   const [userType, setUserType] = useState(null);
   const [connection, setConnection] = useState(null);
   const [isSheetVisible, setIsSheetVisible] = useState(false);
@@ -74,12 +37,40 @@ function MainScreen({ navigation, username, userId, userToken }) {
   const webViewRef = useRef(null);
   const eventDisplayRef = useRef(null);
   const sheetRef = useRef(null);
+  const hasHandledParams = useRef(false);
 
   // Handle events:
   var eventList = {
     type: 'eventList',
     events: []
   };
+
+  // Handle route parameters for track selection
+  useEffect(() => {
+    if (route?.params && !hasHandledParams.current && mapReady) {
+      const { mode: routeMode, selectedTrack: routeSelectedTrack } = route.params;
+      
+      if (routeMode === 'freeRun') {
+        // Start free run
+        console.log('Starting free run from route params');
+        webViewRef.current?.postMessage(JSON.stringify({ type: 'startFreeRun' }));
+      } else if (routeMode === 'guidedRun' && routeSelectedTrack) {
+        // Handle guided run with selected track
+        console.log('Starting guided run with track:', routeSelectedTrack);
+        setSelectedTrack(routeSelectedTrack);
+        // You can add logic here to display the selected track on the map
+        // For now, just set the selected track
+      }
+      
+      // Mark as handled to prevent re-triggering
+      hasHandledParams.current = true;
+    }
+  }, [route?.params, mapReady]);
+
+  // Reset the flag when route params change
+  useEffect(() => {
+    hasHandledParams.current = false;
+  }, [route?.params]);
 
   useEffect(() => {
     const connectToSignalR = async () => {
@@ -257,7 +248,7 @@ function MainScreen({ navigation, username, userId, userToken }) {
   const deleteEvent = async (id) => {
     try {
       console.log("deleting event: ", id);
-      const data = await fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/deleteEvent', {
+      const response = await fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/deleteEvent', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -266,6 +257,7 @@ function MainScreen({ navigation, username, userId, userToken }) {
           eventId: id
         }),
       });
+      const data = await response.json();
       console.log('Event deleted successfully:', data);
       eventList.events = eventList.events.filter(event => event.id !== data.eventId);
       webViewRef.current.postMessage(JSON.stringify(eventList));
@@ -299,7 +291,8 @@ function MainScreen({ navigation, username, userId, userToken }) {
 
   const getAllOpenEvents = async () => {
     try {
-      const data = await fetchWithRetry('https://runfuncionapp.azurewebsites.net/api/getAllOpenEvents');
+      const response = await fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/getAllOpenEvents');
+      const data = await response.json();
       console.log('Got Events:', data);
       eventList.events = data.map((event) => ({
         latitude: event.latitude,
@@ -323,9 +316,10 @@ function MainScreen({ navigation, username, userId, userToken }) {
 
  const getUsersEvents = async () => {
   try {
-    const data = await fetchWithAuth(
+    const response = await fetchWithAuth(
       `https://runfuncionapp.azurewebsites.net/api/getUsersEvents?userId=${encodeURIComponent(userId)}`
     );
+    const data = await response.json();
     console.log('Got Events:', data);
     let myEvents = data.map((event) => ({
       latitude: event.latitude,
@@ -350,9 +344,10 @@ function MainScreen({ navigation, username, userId, userToken }) {
 
 const getAllTracks = async () => {
     try {
-      const data = await fetchWithRetry('https://runfuncionapp.azurewebsites.net/api/getAllTracks');
+      const response = await fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/getAllTracks');
+      const data = await response.json();
       console.log('Got Tracks:', data);
-      console.log('first point:', data[0].path[0]);
+      //console.log('first point:', data[0].path[0]);
       const trackIds = data.map(track => track.trackId);
       setTracks(trackIds);
       webViewRef.current.postMessage(JSON.stringify({'type': "tracks", 'tracks': data}));
@@ -377,6 +372,76 @@ const getAllTracks = async () => {
     }
   };
 
+  const createTrack = async (track) => {
+    console.log("Creating track:", track);
+    try {
+      const response = await fetchWithAuth(
+        'https://runfuncionapp.azurewebsites.net/api/createTrack',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            path: track,
+            userId: userId,
+            timestamp: new Date().toISOString()
+          })
+        }
+      );
+      console.log('createTrack response status:', response.status);
+      if (!response.ok) {
+        let errorMsg = 'Failed to create track';
+        try {
+          const errorData = await response.json();
+          errorMsg += ': ' + (errorData.error || JSON.stringify(errorData));
+        } catch (e) {
+          // fallback to text
+          try {
+            const errorText = await response.text();
+            errorMsg += ': ' + errorText;
+          } catch (e2) {}
+        }
+        throw new Error(errorMsg);
+      }
+      const data = await response.json();
+      console.log('Track created successfully');
+      return data.trackId;
+    } catch (error) {
+      console.error('Error creating track:', error);
+      return null;
+    } 
+  };
+
+  const createActivity = async (activity) => {
+    console.log("Logging run to database:", activity);
+    activity.userId = userId;
+    let track_id = await createTrack(activity.path);
+    if (!track_id) {
+      console.error('Error creating track');
+      return;
+    }
+    activity.trackId = track_id;
+    try {
+        const response = await fetchWithAuth(
+            'https://runfuncionapp.azurewebsites.net/api/createActivity',
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(activity)
+            }
+        );
+        if (!response.ok) {
+            // Try to read the error message from the response
+            let errorMsg = `HTTP error! status: ${response.status}`;
+            const errorData = response.error;
+            errorMsg += ` | Details: ${JSON.stringify(errorData)}`;
+            throw new Error(errorMsg);
+        }
+        console.log('Activity logged successfully');
+    } catch (error) {
+        console.error('Error logging activity:', error);
+    }
+  };
+
   const handleSelectLocation = () => {
     console.log("Entering location select mode");
     setMode("selectingLocation");
@@ -398,31 +463,15 @@ const getAllTracks = async () => {
     setIsEventDisplayVisible(true);
   }
 
-  function startFreeRun() {
-    webViewRef.current.postMessage(JSON.stringify({ type: 'startFreeRun' }));
+  function navigateToSelectTrack() {
+    navigation.navigate('SelectTrack');
   }
-
-  const handleLogout = async () => {
-    try {
-      await AsyncStorage.multiRemove(['userToken', 'userId', 'username']);
-      setUserToken(null);
-      setUserId(null);
-      setUsername(null);
-    } catch (error) {
-      console.error('Error during logout:', error);
-    }
-  };
 
   // Listen for messages from the map:
   const handleWebViewMessage = (event) => {
     try {
         const data = JSON.parse(event.nativeEvent.data);
         console.log('Received message from WebView:', data);
-
-        if (data.data.action === 'logout') {
-            handleLogout();
-            return;
-        }
 
         if (data.data.action === "delete") {
           console.log('Delete event:', data.data.id);
@@ -473,7 +522,14 @@ const getAllTracks = async () => {
           setMode("freeRun")
         } else if (data.data.action === "leaveFreeRunMode") {
           setMode("mainMap");
-        } else {
+        } else if (data.data.action === "logRun") {
+          console.log("Logging run to database, navigating to RunSummary");
+          createActivity(data.data.activity);
+          navigation.navigate('RunSummary', {
+            run: data.data.activity,
+            track: data.data.track
+          });
+        }else {
           console.warn('Unknown action:', data.data.action);
         }
     } catch (error) {
@@ -514,7 +570,7 @@ const getAllTracks = async () => {
           </TouchableOpacity>
         )}
         {mode === "mainMap" && (
-          <TouchableOpacity id="startFreeRunBtn" style={styles.freeRunBtn} onPress={startFreeRun}>
+          <TouchableOpacity id="startFreeRunBtn" style={styles.freeRunBtn} onPress={navigateToSelectTrack}>
             <Text style={styles.fabText}>🏃</Text>
           </TouchableOpacity>
         )}
@@ -740,6 +796,48 @@ export default function App() {
                   username={username}
                   userId={userId}
                   onLogout={handleLogout}
+                />
+              )}
+            </Stack.Screen>
+            <Stack.Screen 
+              name="RunSummary" 
+              options={{ 
+                title: 'Run Summary',
+                headerStyle: {
+                  backgroundColor: '#007AFF',
+                },
+                headerTintColor: '#fff',
+                headerTitleStyle: {
+                  fontWeight: 'bold',
+                },
+              }}
+            >
+              {props => (
+                <RunSummaryScreen 
+                  {...props}
+                  username={username}
+                  userId={userId}
+                />
+              )}
+            </Stack.Screen>
+            <Stack.Screen 
+              name="SelectTrack" 
+              options={{ 
+                title: 'Select Track',
+                headerStyle: {
+                  backgroundColor: '#007AFF',
+                },
+                headerTintColor: '#fff',
+                headerTitleStyle: {
+                  fontWeight: 'bold',
+                },
+              }}
+            >
+              {props => (
+                <SelectTrackScreen 
+                  {...props}
+                  username={username}
+                  userId={userId}
                 />
               )}
             </Stack.Screen>
