@@ -15,7 +15,7 @@ import RegisterScreen from './RegisterScreen';
 import { get } from 'react-native/Libraries/TurboModule/TurboModuleRegistry';
 import { ConsoleLogger } from '@microsoft/signalr/dist/esm/Utils';
 import UserProfileScreen from './UserProfileScreen';
-import { fetchWithAuth } from './utils/api';
+import { fetchWithAuth, setEventReady, markUserReady, getEventReadyUsers, startEvent, updateRunnerPosition, getEventRunnersPositions, endEventRun, leaveEvent } from './utils/api';
 import RunSummaryScreen from './RunSummaryScreen';
 import SelectTrackScreen from './SelectTrackScreen';
 
@@ -32,7 +32,15 @@ function MainScreen({ navigation, username, userId, userToken, route }) {
   const [isEventDisplayVisible, setIsEventDisplayVisible] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [mapReady, setMapReady] = useState(false);
-  const [mode, setMode] = useState("mainMap");
+  const [mode, setMode] = useState("mainMap"); // mainMap, selectingLocation, selectingTrack, freeRun, eventRun
+  const [currentEventRun, setCurrentEventRun] = useState(null); // New state for current event run
+  const [eventRunners, setEventRunners] = useState([]); // New state for tracking all runners in event
+
+  // Add refs to always have latest state in event handlers
+  const modeRef = useRef(mode);
+  const currentEventRunRef = useRef(currentEventRun);
+  useEffect(() => { modeRef.current = mode; }, [mode]);
+  useEffect(() => { currentEventRunRef.current = currentEventRun; }, [currentEventRun]);
 
   const webViewRef = useRef(null);
   const eventDisplayRef = useRef(null);
@@ -126,6 +134,154 @@ function MainScreen({ navigation, username, userId, userToken, route }) {
         }
       });
 
+        signalrConnection.on("eventDeleted", (eventId) => {
+          try {
+            console.log("SignalR: Received eventDeleted", eventId);
+            // Instead of telling the WebView to remove one marker, we'll just
+            // ask the server for the new, authoritative list of events.
+            // This prevents state inconsistencies.
+            getAllOpenEvents();
+          } catch (err) {
+            console.error("Error handling eventDeleted message:", err);
+          }
+        });
+
+        signalrConnection.on("eventStatusChanged", (eventId) => {
+          try {
+            console.log("SignalR: Received eventStatusChanged", eventId);
+            // The user is a participant if they are the host OR if they have joined the event.
+            // We can check against the list of events the user has joined.
+            // Let's assume you have a state `usersEvents` that holds this info.
+            // Or we can just refresh all events to get the latest state.
+            // Refreshing is simpler and less prone to state inconsistencies.
+            getAllOpenEvents();
+            
+          } catch (err) {
+            console.error("Error handling eventStatusChanged message:", err);
+          }
+        });
+
+        // New event running SignalR handlers
+        signalrConnection.on("eventStarted", (eventData) => {
+          try {
+            console.log("SignalR: Received eventStarted", eventData);
+            handleEventStarted(eventData);
+          } catch (err) {
+            console.error("Error handling eventStarted message:", err);
+          }
+        });
+
+        signalrConnection.on("runnerPositionUpdate", (positionData) => {
+          try {
+            console.log("SignalR: Received runnerPositionUpdate", positionData);
+            console.log("Current user ID:", userId);
+            console.log("Position data user ID:", positionData.userId);
+            console.log("Current mode:", modeRef.current);
+            console.log("Current event run:", currentEventRunRef.current);
+            
+            // Check if user is currently participating in an event run
+            if (modeRef.current !== "eventRun" || !currentEventRunRef.current) {
+              console.log("Ignoring position update - user not in event run mode");
+              return;
+            }
+            
+            // Check if the position update is for the current event
+            if (positionData.eventId !== currentEventRunRef.current.eventId) {
+              console.log("Ignoring position update - not for current event");
+              return;
+            }
+            
+            // Ignore position updates for the current user (they have their own green marker)
+            if (positionData.userId === userId) {
+              console.log("Ignoring position update - it's for the current user");
+              return;
+            }
+            
+            // Update local runners state
+            setEventRunners(prevRunners => {
+              const updatedRunners = prevRunners.filter(runner => runner.userId !== positionData.userId);
+              return [...updatedRunners, positionData];
+            });
+            
+            // Send to WebView (only for other runners)
+            console.log("Sending position update to WebView for other runner:", positionData);
+            webViewRef.current.postMessage(JSON.stringify({
+              type: 'updateRunnerPosition',
+              data: positionData
+            }));
+          } catch (err) {
+            console.error("Error handling runnerPositionUpdate message:", err);
+          }
+        });
+
+        signalrConnection.on("eventRunEnded", (runData) => {
+          try {
+            console.log("SignalR: Received eventRunEnded", runData);
+            console.log("Current mode:", modeRef.current);
+            console.log("Current event run:", currentEventRunRef.current);
+            
+            // Check if user is currently participating in an event run
+            if (modeRef.current !== "eventRun" || !currentEventRunRef.current) {
+              console.log("Ignoring event run ended - user not in event run mode");
+              return;
+            }
+            
+            // Check if the event end is for the current event
+            if (runData.eventId !== currentEventRunRef.current.eventId) {
+              console.log("Ignoring event run ended - not for current event");
+              return;
+            }
+            
+            // If this is another user's run ending, we might want to show a notification
+            if (runData.userId !== userId) {
+              // Could show a toast notification here
+              console.log(`User ${runData.userId} finished the event run`);
+            }
+          } catch (err) {
+            console.error("Error handling eventRunEnded message:", err);
+          }
+        });
+
+        signalrConnection.on("runnerRemoved", (removalData) => {
+          try {
+            console.log("SignalR: Received runnerRemoved", removalData);
+            console.log("Current mode:", modeRef.current);
+            console.log("Current event run:", currentEventRunRef.current);
+            
+            // Check if user is currently participating in an event run
+            if (modeRef.current !== "eventRun" || !currentEventRunRef.current) {
+              console.log("Ignoring runner removal - user not in event run mode");
+              return;
+            }
+            
+            // Check if the removal is for the current event
+            if (removalData.eventId !== currentEventRunRef.current.eventId) {
+              console.log("Ignoring runner removal - not for current event");
+              return;
+            }
+            
+            // Ignore removal updates for the current user
+            if (removalData.userId === userId) {
+              console.log("Ignoring runner removal - it's for the current user");
+              return;
+            }
+            
+            // Remove the runner from local state
+            setEventRunners(prevRunners => 
+              prevRunners.filter(runner => runner.userId !== removalData.userId)
+            );
+            
+            // Send to WebView to remove the runner marker (only for other runners)
+            console.log("Removing runner marker from WebView for other runner:", removalData.userId);
+            webViewRef.current.postMessage(JSON.stringify({
+              type: 'removeRunner',
+              data: { userId: removalData.userId }
+            }));
+          } catch (err) {
+            console.error("Error handling runnerRemoved message:", err);
+          }
+        });
+
         // Add reconnecting and reconnected handlers
         signalrConnection.onreconnecting((error) => {
           console.log("SignalR reconnecting:", error);
@@ -180,6 +336,11 @@ function MainScreen({ navigation, username, userId, userToken, route }) {
               webViewRef.current.postMessage(
                 JSON.stringify({ type: 'userLocation', location })
               );
+              
+              // If in event run mode, also send position to backend
+              if (mode === "eventRun" && currentEventRun) {
+                updateEventPosition(location);
+              }
             }
           },
           (error) => {
@@ -212,15 +373,16 @@ function MainScreen({ navigation, username, userId, userToken, route }) {
 
   useEffect(() => {
     if (mapReady && username) {
-      // Send username to WebView
+      // Send user ID to WebView for proper filtering
       webViewRef.current?.postMessage(
         JSON.stringify({
           type: 'userIdentity',
-          username: username
+          username: username,
+          userId: userId,
         })
       );
     }
-  }, [mapReady, username]);
+  }, [mapReady, username, userId]);
 
   const createEvent = async (event) => {
     try {
@@ -233,10 +395,6 @@ function MainScreen({ navigation, username, userId, userToken, route }) {
         }),
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to create event');
-      }
-
       // Refresh events list
       getAllOpenEvents();
     } catch (error) {
@@ -247,8 +405,9 @@ function MainScreen({ navigation, username, userId, userToken, route }) {
 
   const deleteEvent = async (id) => {
     try {
+
       console.log("deleting event: ", id);
-      const response = await fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/deleteEvent', {
+      const data = await fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/deleteEvent', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -257,19 +416,20 @@ function MainScreen({ navigation, username, userId, userToken, route }) {
           eventId: id
         }),
       });
-      const data = await response.json();
       console.log('Event deleted successfully:', data);
       eventList.events = eventList.events.filter(event => event.id !== data.eventId);
       webViewRef.current.postMessage(JSON.stringify(eventList));
+ 
     } catch (error) {
-      console.error('Error deleting event:', error);
-      // Handle error appropriately
+      console.error('Error requesting event deletion:', error);
+      Alert.alert('Error', 'Failed to send delete request. The event may not have been deleted.');
     }
   };
 
   const joinEvent = async (event_id) => {
     try {
-      const response = await fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/joinEvent', {
+      console.log('Joining event with userId:', userId, 'eventId:', event_id);
+      const responseData = await fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/joinEvent', {
         method: 'POST',
         body: JSON.stringify({
           eventId: event_id,
@@ -277,9 +437,7 @@ function MainScreen({ navigation, username, userId, userToken, route }) {
         }),
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to join event');
-      }
+      console.log('Join event success response:', responseData);
 
       // Refresh user's events
       getUsersEvents();
@@ -291,8 +449,7 @@ function MainScreen({ navigation, username, userId, userToken, route }) {
 
   const getAllOpenEvents = async () => {
     try {
-      const response = await fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/getAllOpenEvents');
-      const data = await response.json();
+      const data = await fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/getAllOpenEvents');
       console.log('Got Events:', data);
       eventList.events = data.map((event) => ({
         latitude: event.latitude,
@@ -316,10 +473,9 @@ function MainScreen({ navigation, username, userId, userToken, route }) {
 
  const getUsersEvents = async () => {
   try {
-    const response = await fetchWithAuth(
+    const data = await fetchWithAuth(
       `https://runfuncionapp.azurewebsites.net/api/getUsersEvents?userId=${encodeURIComponent(userId)}`
     );
-    const data = await response.json();
     console.log('Got Events:', data);
     let myEvents = data.map((event) => ({
       latitude: event.latitude,
@@ -344,8 +500,7 @@ function MainScreen({ navigation, username, userId, userToken, route }) {
 
 const getAllTracks = async () => {
     try {
-      const response = await fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/getAllTracks');
-      const data = await response.json();
+      const data = await fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/getAllTracks');
       console.log('Got Tracks:', data);
       //console.log('first point:', data[0].path[0]);
       const trackIds = data.map(track => track.trackId);
@@ -359,13 +514,20 @@ const getAllTracks = async () => {
 
   const getEventUsersForDisplay = async (id, eventObject) => {
     try {
-      const data = await fetchWithAuth(
-        `https://runfuncionapp.azurewebsites.net/api/getEventUsers?eventId=${encodeURIComponent(id)}`
-      );
+      const [usersResponse, readyUsersResponse] = await Promise.all([
+        fetchWithAuth(
+          `https://runfuncionapp.azurewebsites.net/api/getEventRegisteredUsers?eventId=${encodeURIComponent(id)}`
+        ),
+        fetchWithAuth(
+          `https://runfuncionapp.azurewebsites.net/api/getEventReadyUsers?eventId=${encodeURIComponent(id)}`
+        )
+      ]);
       
-      eventObject["usersList"] = data;
+      eventObject["usersList"] = usersResponse;
+      eventObject["readyUsers"] = readyUsersResponse.map(user => user.UserId);
       setSelectedEvent(eventObject);
-      console.log('Got users:', data);
+      console.log('Got users:', usersResponse);
+      console.log('Got ready users:', readyUsersResponse);
     } catch (error) {
       console.error('Error fetching event users:', error);
       // Handle error appropriately
@@ -375,7 +537,7 @@ const getAllTracks = async () => {
   const createTrack = async (track) => {
     console.log("Creating track:", track);
     try {
-      const response = await fetchWithAuth(
+      const data = await fetchWithAuth(
         'https://runfuncionapp.azurewebsites.net/api/createTrack',
         {
           method: 'POST',
@@ -387,22 +549,6 @@ const getAllTracks = async () => {
           })
         }
       );
-      console.log('createTrack response status:', response.status);
-      if (!response.ok) {
-        let errorMsg = 'Failed to create track';
-        try {
-          const errorData = await response.json();
-          errorMsg += ': ' + (errorData.error || JSON.stringify(errorData));
-        } catch (e) {
-          // fallback to text
-          try {
-            const errorText = await response.text();
-            errorMsg += ': ' + errorText;
-          } catch (e2) {}
-        }
-        throw new Error(errorMsg);
-      }
-      const data = await response.json();
       console.log('Track created successfully');
       return data.trackId;
     } catch (error) {
@@ -421,7 +567,7 @@ const getAllTracks = async () => {
     }
     activity.trackId = track_id;
     try {
-        const response = await fetchWithAuth(
+        const data = await fetchWithAuth(
             'https://runfuncionapp.azurewebsites.net/api/createActivity',
             {
                 method: 'POST',
@@ -429,13 +575,6 @@ const getAllTracks = async () => {
                 body: JSON.stringify(activity)
             }
         );
-        if (!response.ok) {
-            // Try to read the error message from the response
-            let errorMsg = `HTTP error! status: ${response.status}`;
-            const errorData = response.error;
-            errorMsg += ` | Details: ${JSON.stringify(errorData)}`;
-            throw new Error(errorMsg);
-        }
         console.log('Activity logged successfully');
     } catch (error) {
         console.error('Error logging activity:', error);
@@ -467,6 +606,233 @@ const getAllTracks = async () => {
     navigation.navigate('SelectTrack');
   }
 
+  const handleStartEvent = async (eventId) => {
+    try {
+      const response = await setEventReady(eventId);
+
+      // Update the event in the local state
+      const updatedEvent = { ...selectedEvent, status: 'ready' };
+      setSelectedEvent(updatedEvent);
+
+      // Update the event in the events list
+      eventList.events = eventList.events.map(event => 
+        event.id === eventId ? { ...event, status: 'ready' } : event
+      );
+      webViewRef.current.postMessage(JSON.stringify(eventList));
+
+    } catch (error) {
+      console.error('Error starting event:', error);
+      Alert.alert('Error', 'Failed to start event');
+    }
+  };
+
+  const handleMarkReady = async (eventId) => {
+    try {
+      const response = await markUserReady(eventId, userId);
+
+      // Update the ready users list in the selected event
+      const updatedEvent = {
+        ...selectedEvent,
+        readyUsers: [...(selectedEvent.readyUsers || []), userId]
+      };
+      setSelectedEvent(updatedEvent);
+
+    } catch (error) {
+      console.error('Error marking as ready:', error);
+      Alert.alert('Error', 'Failed to mark as ready');
+    }
+  };
+
+  const handleStartEventNow = async (eventId) => {
+    try {
+      const response = await startEvent(eventId, userId);
+
+      // Update the event in the local state
+      const updatedEvent = { ...selectedEvent, status: 'started' };
+      setSelectedEvent(updatedEvent);
+
+      // Update the event in the events list
+      eventList.events = eventList.events.map(event => 
+        event.id === eventId ? { ...event, status: 'started' } : event
+      );
+      webViewRef.current.postMessage(JSON.stringify(eventList));
+
+      // Close the event display
+      setIsEventDisplayVisible(false);
+
+    } catch (error) {
+      console.error('Error starting event:', error);
+      Alert.alert('Error', 'Failed to start event');
+    }
+  };
+
+  // New event running handlers
+  const handleEventStarted = async (eventData) => {
+    try {
+      console.log('Event started:', eventData);
+      console.log('Current userId:', userId);
+      console.log('Ready users:', eventData.readyUsers);
+      console.log('Removed users:', eventData.removedUsers);
+      console.log('Selected event host:', selectedEvent?.host);
+      
+      // Check if current user was removed for not being ready
+      if (eventData.removedUsers && eventData.removedUsers.includes(userId)) {
+        console.log('User was removed from event for not being ready');
+        Alert.alert(
+          'Removed from Event',
+          'You were removed from the event because you were not marked as ready when the host started the event.',
+          [{ text: 'OK' }]
+        );
+        
+        // Close event display if it's open
+        if (isEventDisplayVisible) {
+          setIsEventDisplayVisible(false);
+        }
+        
+        // Refresh events to update the UI
+        getAllOpenEvents();
+        getUsersEvents();
+        return;
+      }
+      
+      // Check if current user is a participant in this event
+      // This includes both ready users and the host
+      const isParticipant = eventData.readyUsers.includes(userId) || selectedEvent?.host === userId;
+      console.log('Is participant:', isParticipant);
+      
+      if (isParticipant) {
+        console.log('Starting event run for participant');
+        // Set current event run state
+        setCurrentEventRun({
+          eventId: eventData.eventId,
+          trackId: eventData.trackId,
+          startedAt: eventData.startedAt
+        });
+        
+        // Enter event run
+        setMode("eventRun");
+        
+        // Notify WebView to start event run
+        webViewRef.current.postMessage(JSON.stringify({
+          type: 'startEventRun',
+          data: eventData
+        }));
+        
+        // Start tracking position updates for this event
+        startEventPositionTracking(eventData.eventId);
+      } else {
+        console.log('User is not a participant in this event');
+      }
+    } catch (error) {
+      console.error('Error handling event started:', error);
+    }
+  };
+
+  const startEventPositionTracking = async (eventId) => {
+    try {
+      console.log('Starting event position tracking for event:', eventId);
+      
+      // Get initial positions of all runners
+      const runners = await getEventRunnersPositions(eventId);
+      console.log('Initial runners positions:', runners);
+      
+      setEventRunners(runners);
+      
+      // Filter out the current user from the runners data sent to WebView
+      const otherRunners = runners.filter(runner => {
+        return runner.userId !== userId;
+      });
+      console.log('Filtered runners (excluding current user):', otherRunners);
+      
+      // Send filtered runners data to WebView (even if empty)
+      console.log('Sending filtered runners data to WebView:', otherRunners);
+      webViewRef.current.postMessage(JSON.stringify({
+        type: 'updateEventRunners',
+        data: otherRunners
+      }));
+    } catch (error) {
+      console.error('Error getting event runners positions:', error);
+    }
+  };
+
+  const updateEventPosition = async (location) => {
+    if (!currentEventRun) return;
+    
+    try {
+      console.log('Sending position update to backend:', {
+        eventId: currentEventRun.eventId,
+        userId: userId,
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        speed: location.coords.speed || 0,
+        heading: location.coords.heading || 0
+      });
+      
+      await updateRunnerPosition(
+        currentEventRun.eventId,
+        userId,
+        location.coords.latitude,
+        location.coords.longitude,
+        location.coords.speed || 0,
+        location.coords.heading || 0,
+        0, // distance - will be calculated by the WebView
+        0  // elapsedTime - will be calculated by the WebView
+      );
+      
+      console.log('Position update sent successfully');
+    } catch (error) {
+      console.error('Error updating event position:', error);
+    }
+  };
+
+  const handleEndEventRun = async (runData) => {
+    if (!currentEventRun) return;
+    
+    try {
+      await endEventRun(
+        currentEventRun.eventId,
+        userId,
+        runData.distance,
+        runData.duration,
+        runData.calories,
+        runData.pace,
+        runData.speed,
+        runData.path
+      );
+
+      // Exit event run mode
+      setCurrentEventRun(null);
+      setEventRunners([]);
+      setMode("mainMap");
+      getAllOpenEvents();
+      
+      // Notify WebView to exit event run mode and clear all runner markers
+      webViewRef.current.postMessage(JSON.stringify({
+        type: 'endEventRun'
+      }));
+      
+    } catch (error) {
+      console.error('Error ending event run:', error);
+      Alert.alert('Error', 'Failed to end event run');
+    }
+  };
+
+  const handleLeaveEvent = async (eventId) => {
+    try {
+      console.log('Leaving event:', eventId, 'with userId:', userId);
+      await leaveEvent(eventId, userId, userId);
+
+      // Refresh user's events
+      getUsersEvents();
+      
+      // Close the event display
+      setIsEventDisplayVisible(false);
+    } catch (error) {
+      console.error('Error leaving event:', error);
+      Alert.alert('Error', 'Failed to leave event');
+    }
+  };
+
   // Listen for messages from the map:
   const handleWebViewMessage = (event) => {
     try {
@@ -484,7 +850,7 @@ const getAllTracks = async () => {
           getAllOpenEvents();
           webViewRef.current.postMessage(JSON.stringify(eventList));
         } else if (data.data.action === "getUserLocation") {
-          console.log("sending location");
+          //console.log("sending location");
           getUserLocation();
         } else if (data.data.action === "navigateToProfile") {
           navigation.navigate('UserProfile');
@@ -522,6 +888,18 @@ const getAllTracks = async () => {
           setMode("freeRun")
         } else if (data.data.action === "leaveFreeRunMode") {
           setMode("mainMap");
+        } else if (data.data.action === "enterEventRunMode") {
+          setMode("eventRun");
+        } else if (data.data.action === "leaveEventRunMode") {
+          setMode("mainMap");
+          setCurrentEventRun(null);
+          setEventRunners([]);
+        } else if (data.data.action === "updateEventPosition") {
+          // Handle position updates during event run
+          updateEventPosition(data.data.location);
+        } else if (data.data.action === "endEventRun") {
+          // Handle ending event run
+          handleEndEventRun(data.data.runData);
         } else if (data.data.action === "logRun") {
           console.log("Logging run to database, navigating to RunSummary");
           createActivity(data.data.activity);
@@ -593,9 +971,11 @@ const getAllTracks = async () => {
             eventObject={selectedEvent}
             joinEvent={joinEvent}
             deleteEvent={deleteEvent}
+            leaveEvent={handleLeaveEvent}
             userId={userId}
-            username={username}
-            onClose={() => setIsEventDisplayVisible(false)}
+            onStartEvent={handleStartEvent}
+            onMarkReady={handleMarkReady}
+            onStartEventNow={handleStartEventNow}
           />
         )}
       </View>

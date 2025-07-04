@@ -25,8 +25,7 @@ export default function SelectTrackScreen({ navigation, route }) {
   const fetchTracks = async () => {
     try {
       setLoading(true);
-      const response = await fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/getAllTracks');
-      const data = await response.json();
+      const data = await fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/getAllTracks');
       
       // Process tracks to calculate distance and add display info
       const processedTracks = data.map(track => {

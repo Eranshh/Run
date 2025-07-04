@@ -79,10 +79,9 @@ export default function UserProfileScreen({ navigation, username, userId, onLogo
     const getUserRuns = async () => {
       try {
         console.log("Fetching runs for user:", userId);
-        const response = await fetchWithAuth(
+        const data = await fetchWithAuth(
           `https://runfuncionapp.azurewebsites.net/api/getUsersActivities?userId=${encodeURIComponent(userId)}`
         );
-        const data = await response.json();
         setRuns(data);
       } catch (error) {
         console.error('Error fetching runs:', error);

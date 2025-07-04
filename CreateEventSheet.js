@@ -51,7 +51,7 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
       startTime: Number(startTime),
       status,
       difficulty,
-      track,
+      trackId: track,
       name
     };
 
