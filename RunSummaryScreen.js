@@ -46,11 +46,14 @@ export default function RunSummaryScreen({ route }) {
     }
   }, [track]);
 
+  // Pick the first available date field
+  const runDate = run.timestamp || run.date || run.start_time || run.stop_time;
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{run.name || 'Run Summary'}</Text>
       <View style={styles.statsCard}>
-        <View style={styles.statRow}><Text style={styles.statLabel}>📅 Date:</Text><Text style={styles.statValue}>{new Date(run.date).toLocaleString()}</Text></View>
+        <View style={styles.statRow}><Text style={styles.statLabel}>📅 Date:</Text><Text style={styles.statValue}>{runDate ? new Date(runDate).toLocaleString() : 'N/A'}</Text></View>
         <View style={styles.statRow}><Text style={styles.statLabel}>📏 Distance:</Text><Text style={styles.statValue}>{(run.distance / 1000).toFixed(2)} km</Text></View>
         <View style={styles.statRow}><Text style={styles.statLabel}>⏱️ Duration:</Text><Text style={styles.statValue}>{Math.floor(run.duration / 60)} min</Text></View>
         <View style={styles.statRow}><Text style={styles.statLabel}>🏃 Pace:</Text><Text style={styles.statValue}>{run.averagePace?.toFixed(2) || 'N/A'} min/km</Text></View>

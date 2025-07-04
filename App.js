@@ -523,9 +523,13 @@ const getAllTracks = async () => {
         } else if (data.data.action === "leaveFreeRunMode") {
           setMode("mainMap");
         } else if (data.data.action === "logRun") {
-          console.log("Logging run to database");
+          console.log("Logging run to database, navigating to RunSummary");
           createActivity(data.data.activity);
-        } else {
+          navigation.navigate('RunSummary', {
+            run: data.data.activity,
+            track: data.data.track
+          });
+        }else {
           console.warn('Unknown action:', data.data.action);
         }
     } catch (error) {
