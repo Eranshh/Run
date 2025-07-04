@@ -13,8 +13,8 @@ import { fetchWithAuth } from './utils/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CommonActions } from '@react-navigation/native';
 
-const RunItem = ({ run }) => (
-  <TouchableOpacity style={styles.runItem}>
+const RunItem = ({ run, onPress }) => (
+  <TouchableOpacity style={styles.runItem} onPress={() => onPress(run)}>
     <View style={styles.runHeader}>
       <Text style={styles.runDate}>{new Date(run.date).toLocaleDateString()}</Text>
       <Text style={styles.runType}>{run.type}</Text>
@@ -53,6 +53,7 @@ const RunItem = ({ run }) => (
 export default function UserProfileScreen({ navigation, username, userId, onLogout }) {
   const [runs, setRuns] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [userTracks, setUserTracks] = useState([]);
 
   const handleLogout = async () => {
     try {
@@ -61,6 +62,17 @@ export default function UserProfileScreen({ navigation, username, userId, onLogo
       console.error('Error during logout:', error);
       Alert.alert('Error', 'Failed to logout. Please try again.');
     }
+  };
+
+  const handleRunPress = (run) => {
+    console.log('handleRunPress called with run:', run);
+    console.log('userTracks:', userTracks);
+    console.log('Looking for trackId:', run.trackId);
+    
+    const track = userTracks.find(t => t.trackId === run.trackId);
+    console.log('Found track:', track);
+    
+    navigation.navigate('RunSummary', { run, track });
   };
 
   useEffect(() => {
@@ -83,6 +95,40 @@ export default function UserProfileScreen({ navigation, username, userId, onLogo
     };
 
     getUserRuns();
+  }, [userId]);
+
+  useEffect(() => {
+    const getUserTracks = async () => {
+      try {
+        const response = await fetchWithAuth(
+          `https://runfuncionapp.azurewebsites.net/api/getUsersTracks?userId=${encodeURIComponent(userId)}`
+        );
+        console.log('getUsersTracks response status:', response.status);
+        
+        if(!response.ok) {
+          throw new Error('Failed to fetch tracks');
+        }
+        
+        const data = await response.json();
+        console.log('getUsersTracks raw data:', data);
+        console.log('Number of tracks received:', data.length);
+        
+        // Log each track to see the structure
+        data.forEach((track, index) => {
+          console.log(`Track ${index}:`, track);
+        });
+        
+        const tracks = data.map(track => ({
+          ...track,
+          path: typeof track.path === 'string' ? JSON.parse(track.path) : track.path,
+        }));
+        
+        setUserTracks(tracks);
+      } catch (error) {
+        console.error('Error fetching tracks:', error);
+      }
+    };
+    getUserTracks();
   }, [userId]);
 
   if (isLoading) {
@@ -110,7 +156,7 @@ export default function UserProfileScreen({ navigation, username, userId, onLogo
       
       <FlatList
         data={runs}
-        renderItem={({ item }) => <RunItem run={item} />}
+        renderItem={({ item }) => <RunItem run={item} onPress={handleRunPress} />}
         keyExtractor={item => item.id}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
