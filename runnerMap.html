@@ -783,6 +783,11 @@
             });
             map.setCamera({ zoom: 15, bearing: 0, pitch: 0 });
 
+            // Remove the free run line from the map
+            if (freeRunDataSource) {
+                freeRunDataSource.setShapes([]);
+            }
+
             const totalDistance = calculateTotalDistance(freeRunPath);
             // Display summary
             // document.getElementById('runStats').style.display = 'none';
