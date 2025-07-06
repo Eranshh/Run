@@ -214,34 +214,6 @@ function MainScreen({ navigation, username, userId, userToken, route }) {
           }
         });
 
-        signalrConnection.on("eventRunEnded", (runData) => {
-          try {
-            console.log("SignalR: Received eventRunEnded", runData);
-            console.log("Current mode:", modeRef.current);
-            console.log("Current event run:", currentEventRunRef.current);
-            
-            // Check if user is currently participating in an event run
-            if (modeRef.current !== "eventRun" || !currentEventRunRef.current) {
-              console.log("Ignoring event run ended - user not in event run mode");
-              return;
-            }
-            
-            // Check if the event end is for the current event
-            if (runData.eventId !== currentEventRunRef.current.eventId) {
-              console.log("Ignoring event run ended - not for current event");
-              return;
-            }
-            
-            // If this is another user's run ending, we might want to show a notification
-            if (runData.userId !== userId) {
-              // Could show a toast notification here
-              console.log(`User ${runData.userId} finished the event run`);
-            }
-          } catch (err) {
-            console.error("Error handling eventRunEnded message:", err);
-          }
-        });
-
         signalrConnection.on("runnerRemoved", (removalData) => {
           try {
             console.log("SignalR: Received runnerRemoved", removalData);
@@ -785,19 +757,13 @@ const getAllTracks = async () => {
     }
   };
 
-  const handleEndEventRun = async (runData) => {
+  const handleEndEventRun = async () => {
     if (!currentEventRun) return;
     
     try {
       await endEventRun(
         currentEventRun.eventId,
         userId,
-        runData.distance,
-        runData.duration,
-        runData.calories,
-        runData.pace,
-        runData.speed,
-        runData.path
       );
 
       // Exit event run mode
@@ -805,11 +771,6 @@ const getAllTracks = async () => {
       setEventRunners([]);
       setMode("mainMap");
       getAllOpenEvents();
-      
-      // Notify WebView to exit event run mode and clear all runner markers
-      webViewRef.current.postMessage(JSON.stringify({
-        type: 'endEventRun'
-      }));
       
     } catch (error) {
       console.error('Error ending event run:', error);
@@ -886,20 +847,16 @@ const getAllTracks = async () => {
           openEventDisplay();
         } else if (data.data.action === "enterFreeRunMode") {
           setMode("freeRun")
-        } else if (data.data.action === "leaveFreeRunMode") {
-          setMode("mainMap");
         } else if (data.data.action === "enterEventRunMode") {
           setMode("eventRun");
-        } else if (data.data.action === "leaveEventRunMode") {
+        } else if (data.data.action === "leaveRunMode") {
           setMode("mainMap");
-          setCurrentEventRun(null);
-          setEventRunners([]);
         } else if (data.data.action === "updateEventPosition") {
           // Handle position updates during event run
           updateEventPosition(data.data.location);
         } else if (data.data.action === "endEventRun") {
           // Handle ending event run
-          handleEndEventRun(data.data.runData);
+          handleEndEventRun();
         } else if (data.data.action === "logRun") {
           console.log("Logging run to database, navigating to RunSummary");
           createActivity(data.data.activity);

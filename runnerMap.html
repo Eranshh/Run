@@ -9,22 +9,7 @@
         html, body { margin: 0; padding: 0; height: 100%; width: 100%; }
         #myMap { width: 100%; height: 100vh; }
 
-        #stopFreeRunBtn  {
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            font-size: 32px;
-            background-color: red;
-            color: white;
-            border: none;
-            cursor: pointer;
-            z-index: 1000;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-        }
-        #stopEventRunBtn  {
+        #stopRunBtn  {
             position: fixed;
             bottom: 20px;
             left: 20px;
@@ -40,7 +25,7 @@
             box-shadow: 0 4px 8px rgba(0,0,0,0.3);
         }
 
-        #pauseFreeRunBtn  {
+        #pauseRunBtn  {
             position: fixed;
             bottom: 20px;
             left: 100px;
@@ -55,21 +40,7 @@
             z-index: 1000;
             box-shadow: 0 4px 8px rgba(0,0,0,0.3);
         }
-        #pauseEventRunBtn  {
-            position: fixed;
-            bottom: 20px;
-            left: 100px;
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            font-size: 32px;
-            background-color: orange;
-            color: white;
-            border: none;
-            cursor: pointer;
-            z-index: 1000;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-        }
+        
         #confirmLocationBtn {
             position: fixed;
             bottom: 90px;
@@ -302,14 +273,12 @@
 
     <script>
         let map;
-        let freeRunActive = false;
-        let eventRunActive = false;
+        let runActive = false;
         let currentUser = null;
         let currentUserId = null; // Add userId for proper filtering
         let currentEventRun = null;
         let eventRunners = new Map(); // Map of userId -> runner data
         let eventRunnerMarkers = new Map(); // Map of userId -> marker
-        let eventRunnerPaths = new Map(); // Map of userId -> path data source
         let eventTrackId = null;
         let eventTrackLayer = null;
         let eventTrackSource = null;
@@ -396,10 +365,8 @@
                         else if (type === 'userLocation') {
                             const { location } = data;
                             
-                            if (freeRunActive) {
-                            freeRunLoc(location);
-                            } else if (eventRunActive) {
-                                eventRunLoc(location);
+                            if (runActive) {
+                                runLoc(location);
                             }
 
                             if (!window.userMarker) {
@@ -438,47 +405,15 @@
                             enableTrackSelection();
 
                         }else if (type === 'startFreeRun') {
-                            startFreeRun();
+                            startRun('free', null);
                         }else if (type === 'startEventRun') {
-                            startEventRun(data.data);
+                            startRun('event', data.data);
                         }else if (type === 'updateEventRunners') {
                             updateEventRunners(data.data);
                         }else if (type === 'updateRunnerPosition') {
                             updateRunnerPosition(data.data);
                         }else if (type === 'removeRunner') {
                             removeRunner(data.data.userId);
-                        }else if (type === 'endEventRun') {
-                            // Clear event run state
-                            eventRunActive = false;
-                            currentEventRun = null;
-                            eventRunners.clear();
-                            eventRunnerMarkers.forEach(marker => {
-                                map.markers.remove(marker);
-                            });
-                            eventRunnerMarkers.clear();
-                            eventRunnerPaths.forEach(dataSource => {
-                                map.sources.remove(dataSource);
-                            });
-                            eventRunnerPaths.clear();
-
-                            // Remove event track from map
-                            if (eventTrackLayer) {
-                                map.layers.remove(eventTrackLayer);
-                                eventTrackLayer = null;
-                            }
-                            if (eventTrackSource) {
-                                map.sources.remove(eventTrackSource);
-                                eventTrackSource = null;
-                            }
-                            // Remove the blue user-following track from the map
-                            if (eventRunDataSource) {
-                                map.sources.remove(eventRunDataSource);
-                                eventRunDataSource = null;
-                            }
-                            if (eventRunPolylineSource) {
-                                map.sources.remove(eventRunPolylineSource);
-                                eventRunPolylineSource = null;
-                            }
                         }else if (type === 'log') {
                             console.log('Log from WebView:', data.message);
                         }else {
@@ -752,25 +687,26 @@
         });
     }
         // Free Run functionality
-        let freeRunPaused = false;
-        let freeRunPath = [];
+        let runType = null;
+        let runPaused = false;
+        let runPath = [];
         let freeRunWatchId = null;
-        let freeRunStartTime = null;
-        let freeRunPolylineSource = null;
-        let freeRunDataSource = null;
         let runStartTime = null;
+        let runPolylineSource = null;
+        let runDataSource = null;
         let runTimerInterval = null;
         let totalPausedTime = 0;
         let pauseStartTime = null;
         let totalRunTime = 0
 
-        function startFreeRun() {
+        function startRun(type, eventData) {
             const overlay = document.getElementById('countdownOverlay');
             const text = document.getElementById('countdownText');
             overlay.style.display = 'flex';
             let count = 3;
+            runType = type;
 
-            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'enterFreeRunMode'}}))
+            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: runType === 'free' ? 'enterFreeRunMode' : 'enterEventRunMode'}}))
 
             text.textContent = count;
             const countdownInterval = setInterval(() => {
@@ -781,31 +717,32 @@
                     clearInterval(countdownInterval);
                     overlay.style.display = 'none';
 
-                    freeRunActive = true;
-                    freeRunPaused = false;
-                    freeRunPath = [];
-                    freeRunStartTime = Date.now();
+                    runActive = true;
+                    runPaused = false;
+                    runPath = [];
+                    runStartTime = Date.now();
                     totalPausedTime = 0;
                     totalRunTime = 0;
+                    if (runType === "event") currentEventRun = eventData;
 
-                    window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Free run started'}}));
-                    console.log('Free run started at', new Date(freeRunStartTime).toLocaleString());
-
-                    runStartTime = new Date();
                     updateRunTimer(); // Immediately update UI
                     runTimerInterval = setInterval(updateRunTimer, 1000);
 
-                    document.getElementById('pauseFreeRunBtn').style.display = 'inline';
-                    document.getElementById('stopFreeRunBtn').style.display = 'inline';
+                    document.getElementById('pauseRunBtn').style.display = 'inline';
+                    document.getElementById('stopRunBtn').style.display = 'inline';
                     document.getElementById('runStats').style.display = 'block';
 
-                    if (!freeRunDataSource) {
-                        freeRunDataSource = new atlas.source.DataSource();
-                        map.sources.add(freeRunDataSource);
-                        map.layers.add(new atlas.layer.LineLayer(freeRunDataSource, null, {
+                    if (!runDataSource) {
+                        runDataSource = new atlas.source.DataSource();
+                        map.sources.add(runDataSource);
+                        map.layers.add(new atlas.layer.LineLayer(runDataSource, null, {
                             strokeColor: 'blue',
                             strokeWidth: 3
                         }));
+                    }
+
+                    if (runType === 'event') {
+                        if (eventData.trackId) showEventTrack(eventData.trackId);
                     }
 
                     window.eventMarkers.forEach(marker => {
@@ -815,34 +752,44 @@
             }, 1000);
         }
 
-        function freeRunLoc(location){
-            if (!freeRunActive || freeRunPaused) return;
-            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Free run location updated with coords: ' + JSON.stringify(location.coords)}}));
+        function runLoc(location){
+            if (!runActive || runPaused) return;
+
+            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Run location updated with coords: ' + JSON.stringify(location.coords)}}));
             const { latitude, longitude, speed, heading } = location.coords;
             const point = [longitude, latitude];
-            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'This is point: ' + JSON.stringify(point)}}));
-            freeRunPath.push(point);
+
+            runPath.push(point);
             map.setCamera({ center: point , zoom: 20, bearing: heading ?? 0, pitch: 60 });
 
-            const line = new atlas.data.LineString(freeRunPath);
-            freeRunDataSource.setShapes([new atlas.data.Feature(line)]);
+            const line = new atlas.data.LineString(runPath);
+            runDataSource.setShapes([new atlas.data.Feature(line)]);
 
-            const distance = calculateTotalDistance(freeRunPath);
-            const elapsed = (Date.now() - freeRunStartTime) / 1000;
+            const distance = calculateTotalDistance(runPath);
+            const elapsed = (Date.now() - runStartTime) / 1000;
             const pace = distance > 0 ? (elapsed / 60) / (distance / 1000) : 0;
-            const cal = estimateCalories(distance, freeRunStartTime);
+            const cal = estimateCalories(distance);
             const spd = speed ? (speed * 3.6).toFixed(1) : '0';
             
             document.getElementById('runSpeed').textContent = spd;
             document.getElementById('runDistance').textContent = distance.toFixed(1);
             document.getElementById('runPace').textContent = pace.toFixed(2);
             document.getElementById('runCalories').textContent = cal.toFixed(0);
+
+            if (runType === 'event') {
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                    data: {
+                        action: 'updateEventPosition',
+                        location: location
+                    }
+                }));
+            }
         }
 
-        function pauseFreeRun() {
-            freeRunPaused = !freeRunPaused;
-            document.getElementById('pauseFreeRunBtn').textContent = freeRunPaused ? '▶️' : '⏸️';
-            if(freeRunPaused){
+        function pauseRun() {
+            runPaused = !runPaused;
+            document.getElementById('pauseRunBtn').textContent = runPaused ? '▶️' : '⏸️';
+            if(runPaused){
                 pauseStartTime = new Date();
 
             }else{
@@ -852,30 +799,30 @@
             }
         }
 
-        function stopFreeRun() {
-            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'entering stop run'}}));
-            freeRunActive = false;
+        function stopRun() {
+            runActive = false;
 
-            document.getElementById('pauseFreeRunBtn').style.display = 'none';
-            document.getElementById('stopFreeRunBtn').style.display = 'none';
+            document.getElementById('pauseRunBtn').style.display = 'none';
+            document.getElementById('stopRunBtn').style.display = 'none';
             document.getElementById('runStats').style.display = 'none';
 
-            console.log('Run complete. Total path:', freeRunPath);
+            console.log('Run complete. Total path:', runPath);
             if (runTimerInterval) {
                 clearInterval(runTimerInterval);
                 runTimerInterval = null;
             }
+
             window.eventMarkers.forEach(marker => {
                 marker.setOptions({ visible: true }); // Show event markers
             });
             map.setCamera({ zoom: 15, bearing: 0, pitch: 0 });
 
             // Remove the free run line from the map
-            if (freeRunDataSource) {
-                freeRunDataSource.setShapes([]);
+            if (runDataSource) {
+                runDataSource.setShapes([]);
             }
 
-            const totalDistance = calculateTotalDistance(freeRunPath);
+            const totalDistance = calculateTotalDistance(runPath);
             // Display summary
             // document.getElementById('runStats').style.display = 'none';
             // document.getElementById('runSummary').style.display = 'block';
@@ -889,17 +836,17 @@
             // const pace = totalDistance > 0 ? (totalRunTime / 60) / (totalDistance / 1000) : 0;
             // document.getElementById('summaryPace').textContent = pace.toFixed(2);
 
-            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'leaveFreeRunMode'}}));
+            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'leaveRunMode'}}));
             // drawSummaryRoute();
 
             // Calculate stats
             const duration = totalRunTime; // in seconds
             const averageSpeed = totalDistance > 0 ? (totalDistance / duration) * 3.6 : 0; // km/h
             const averagePace = totalDistance > 0 ? (duration / 60) / (totalDistance / 1000) : 0; // min/km
-            const calories = estimateCalories(totalDistance, freeRunStartTime);
+            const calories = estimateCalories(totalDistance);
 
             // Build activity object
-            const activity = {
+            var activity = {
                 userId: currentUser, // or get from storage/context
                 timestamp: new Date().toISOString(),
                 distance: totalDistance,
@@ -907,13 +854,40 @@
                 averageSpeed: averageSpeed,
                 averagePace: averagePace,
                 calories: calories,
-                start_time: new Date(freeRunStartTime).toISOString(),
+                start_time: new Date(runStartTime).toISOString(),
                 stop_time: new Date().toISOString(),
-                type: 'free run', // or other type
-                path: freeRunPath // if you want to store the path
+                type: (runType === 'free') ? 'Free Run' : 'Event Run', // or other type
+                path: runPath // if you want to store the path
             };
 
-            createActivity(activity, freeRunPath);
+            if (runType === 'event') {
+                activity.eventId = currentEventRun.eventId;
+                if (currentEventRun.trackId) activity.trackId = currentEventRun.trackId;
+            }
+
+            createActivity(activity, runPath);
+
+            if (runType === 'event') {
+                window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'endEventRun'}}));
+
+                // Clear event run state
+                currentEventRun = null;
+                eventRunners.clear();
+                eventRunnerMarkers.forEach(marker => {
+                    map.markers.remove(marker);
+                });
+                eventRunnerMarkers.clear();
+
+                // Remove event track from map
+                if (eventTrackLayer) {
+                    map.layers.remove(eventTrackLayer);
+                    eventTrackLayer = null;
+                }
+                if (eventTrackSource) {
+                    map.sources.remove(eventTrackSource);
+                    eventTrackSource = null;
+                }
+            }
             // window.ReactNativeWebView.postMessage(JSON.stringify({
             //     data: {
             //         action: 'navigateToRunSummary',
@@ -921,6 +895,7 @@
             //         track: { path: freeRunPath }
             //     }
             // }));
+            runType = null;
         }
 
         function closeRunSummary() {
@@ -936,23 +911,21 @@
             return d;
         }
 
-        function estimateCalories(distanceMeters, startTime) {
+        function estimateCalories(distanceMeters) {
             const distanceKm = distanceMeters / 1000;
             const MET = 9.8;
             const weightKg = 70;
-            const hours = (Date.now() - startTime) / (1000 * 60 * 60);
+            const hours = (Date.now() - runStartTime) / (1000 * 60 * 60);
             return MET * weightKg * hours;
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('pauseFreeRunBtn').onclick = pauseFreeRun;
-            document.getElementById('stopFreeRunBtn').onclick = stopFreeRun;
-            document.getElementById('pauseEventRunBtn').onclick = pauseEventRun;
-            document.getElementById('stopEventRunBtn').onclick = stopEventRun;
+            document.getElementById('pauseRunBtn').onclick = pauseRun;
+            document.getElementById('stopRunBtn').onclick = stopRun;
         });
 
         function updateRunTimer() {
-            if (!runStartTime || freeRunPaused) return;
+            if (!runStartTime || runPaused) return;
                 const now = new Date();
                 const elapsed = Math.floor((now - runStartTime - totalPausedTime) / 1000); // in seconds
 
@@ -967,188 +940,6 @@
         }
 
         // free run ends here
-
-        // Event Run functionality
-        let eventRunPaused = false;
-        let eventRunPath = [];
-        let eventRunStartTime = null;
-        let eventRunPolylineSource = null;
-        let eventRunDataSource = null;
-        let eventRunTimerInterval = null;
-        let eventRunTotalPausedTime = 0;
-        let eventRunPauseStartTime = null;
-        let eventRunTotalTime = 0;
-
-        function startEventRun(eventData) {
-            const overlay = document.getElementById('countdownOverlay');
-            const text = document.getElementById('countdownText');
-            overlay.style.display = 'flex';
-            let count = 3;
-
-            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'enterEventRunMode'}}))
-
-            text.textContent = count;
-            const countdownInterval = setInterval(() => {
-                count--;
-                if (count > 0) {
-                    text.textContent = count;
-                } else {
-                    clearInterval(countdownInterval);
-                    overlay.style.display = 'none';
-
-                    eventRunActive = true;
-                    eventRunPaused = false;
-                    eventRunPath = [];
-                    eventRunStartTime = Date.now();
-                    eventRunTotalPausedTime = 0;
-                    eventRunTotalTime = 0;
-                    currentEventRun = eventData;
-
-                    window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Event run started'}}));
-                    console.log('Event run started at', new Date(eventRunStartTime).toLocaleString());
-
-                    updateEventRunTimer(); // Immediately update UI
-                    eventRunTimerInterval = setInterval(updateEventRunTimer, 1000);
-
-                    document.getElementById('pauseEventRunBtn').style.display = 'inline';
-                    document.getElementById('stopEventRunBtn').style.display = 'inline';
-                    document.getElementById('eventRunStats').style.display = 'block';
-
-                    if (!eventRunDataSource) {
-                        eventRunDataSource = new atlas.source.DataSource();
-                        map.sources.add(eventRunDataSource);
-                        map.layers.add(new atlas.layer.LineLayer(eventRunDataSource, null, {
-                            strokeColor: 'blue',
-                            strokeWidth: 3
-                        }));
-                    }
-
-                    // Show event track if it exists
-                    if (eventData.trackId) {
-                        showEventTrack(eventData.trackId);
-                    }
-
-                    window.eventMarkers.forEach(marker => {
-                        marker.setOptions({ visible: false }); // Hide event markers
-                    });
-                }
-            }, 1000);
-        }
-
-        function eventRunLoc(location) {
-            if (!eventRunActive || eventRunPaused) return;
-            
-            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Event run location updated with coords: ' + JSON.stringify(location.coords)}}));
-            const { latitude, longitude, speed, heading } = location.coords;
-            const point = [longitude, latitude];
-            
-            eventRunPath.push(point);
-            map.setCamera({ center: point, zoom: 20, bearing: heading ?? 0, pitch: 60 });
-
-            const line = new atlas.data.LineString(eventRunPath);
-            eventRunDataSource.setShapes([new atlas.data.Feature(line)]);
-
-            const distance = calculateTotalDistance(eventRunPath);
-            const elapsed = (Date.now() - eventRunStartTime) / 1000;
-            const pace = distance > 0 ? (elapsed / 60) / (distance / 1000) : 0;
-            const cal = estimateCalories(distance, eventRunStartTime);
-            const spd = speed ? (speed * 3.6).toFixed(1) : '0';
-
-            document.getElementById('eventRunSpeed').textContent = spd;
-            document.getElementById('eventRunDistance').textContent = distance.toFixed(1);
-            document.getElementById('eventRunPace').textContent = pace.toFixed(2);
-            document.getElementById('eventRunCalories').textContent = cal.toFixed(0);
-
-            // Send position update to backend
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-                data: {
-                    action: 'updateEventPosition',
-                    location: location
-                }
-            }));
-        }
-
-        function pauseEventRun() {
-            eventRunPaused = !eventRunPaused;
-            document.getElementById('pauseEventRunBtn').textContent = eventRunPaused ? '▶️' : '⏸️';
-            if(eventRunPaused) {
-                eventRunPauseStartTime = new Date();
-            } else {
-                const now = new Date();
-                eventRunTotalPausedTime += now - eventRunPauseStartTime;
-                eventRunPauseStartTime = null;
-            }
-        }
-
-        function stopEventRun() {
-            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'entering stop event run'}}));
-            eventRunActive = false;
-
-            document.getElementById('pauseEventRunBtn').style.display = 'none';
-            document.getElementById('stopEventRunBtn').style.display = 'none';
-            document.getElementById('eventRunStats').style.display = 'none';
-
-            console.log('Event run complete. Total path:', eventRunPath);
-            if (eventRunTimerInterval) {
-                clearInterval(eventRunTimerInterval);
-                eventRunTimerInterval = null;
-            }
-
-            window.eventMarkers.forEach(marker => {
-                marker.setOptions({ visible: true }); // Show event markers
-            });
-            map.setCamera({ zoom: 15, bearing: 0, pitch: 0 });
-
-            const totalDistance = calculateTotalDistance(eventRunPath);
-            
-            // Display summary
-            document.getElementById('eventRunStats').style.display = 'none';
-            document.getElementById('eventRunSummary').style.display = 'block';
-            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'showing event run summary menu'}}));
-
-            // Set stats
-            document.getElementById('eventSummaryTime').textContent = document.getElementById('eventRunTime').textContent;
-            document.getElementById('eventSummaryDistance').textContent = totalDistance.toFixed(1);
-            document.getElementById('eventSummaryCalories').textContent = estimateCalories(totalDistance, eventRunStartTime);
-
-            const pace = totalDistance > 0 ? (eventRunTotalTime / 60) / (totalDistance / 1000) : 0;
-            document.getElementById('eventSummaryPace').textContent = pace.toFixed(2);
-
-            // Send run data to backend
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-                data: {
-                    action: 'endEventRun',
-                    runData: {
-                        distance: totalDistance,
-                        duration: eventRunTotalTime,
-                        calories: estimateCalories(totalDistance, eventRunStartTime),
-                        pace: pace,
-                        speed: totalDistance > 0 ? (totalDistance / 1000) / (eventRunTotalTime / 3600) : 0,
-                        path: eventRunPath
-                    }
-                }
-            }));
-
-            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'leaveEventRunMode'}}));
-        }
-
-        function updateEventRunTimer() {
-            if (!eventRunStartTime || eventRunPaused) return;
-            const now = new Date();
-            const elapsed = Math.floor((now - eventRunStartTime - eventRunTotalPausedTime) / 1000); // in seconds
-
-            eventRunTotalTime = elapsed; // Update total run time
-
-            const hours = String(Math.floor(elapsed / 3600)).padStart(2, '0');
-            const minutes = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
-            const seconds = String(elapsed % 60).padStart(2, '0');
-
-            document.getElementById('eventRunTime').textContent = `${hours}:${minutes}:${seconds}`;
-        }
-
-        function closeEventRunSummary() {
-            document.getElementById('eventRunSummary').style.display = 'none';
-        }
         
         function showEventTrack(trackId) {
             if (!window.tracks) {
@@ -1190,10 +981,6 @@
                 map.markers.remove(marker);
             });
             eventRunnerMarkers.clear();
-            eventRunnerPaths.forEach(dataSource => {
-                map.sources.remove(dataSource);
-            });
-            eventRunnerPaths.clear();
 
             // Add new runners
             runners.forEach(runner => {
@@ -1237,17 +1024,9 @@
                 map.markers.remove(marker);
                 eventRunnerMarkers.delete(userId);
             }
-            
-            // Also remove from local runners state if we have it
-            if (window.ReactNativeWebView) {
-                window.ReactNativeWebView.postMessage(JSON.stringify({
-                    data: {
-                        action: 'removeRunner',
-                        userId: userId
-                    }
-                }));
-            }
         }
+
+        // Event run ends here
 
         // Add a function to receive the username from React Native
         window.addEventListener('message', function(event) {
@@ -1316,14 +1095,9 @@
 
 <button id="userBtn" onclick="navigateToProfile()">👤</button>
 
-<div id="freeRunControls" style="position: absolute; top: 10px; left: 10px; z-index: 1000;">
-  <button id="pauseFreeRunBtn" style="display:none;">⏸️</button>
-  <button id="stopFreeRunBtn" style="display:none;">⏹</button>
-</div>
-
-<div id="eventRunControls" style="position: absolute; top: 10px; left: 10px; z-index: 1000;">
-  <button id="pauseEventRunBtn" style="display:none;">⏸️</button>
-  <button id="stopEventRunBtn" style="display:none;">⏹</button>
+<div id="runControls" style="position: absolute; top: 10px; left: 10px; z-index: 1000;">
+  <button id="pauseRunBtn" style="display:none;">⏸️</button>
+  <button id="stopRunBtn" style="display:none;">⏹</button>
 </div>
 
 <div id="runStats" style="display: none; position: absolute; top: 10px; left: 10px; background: rgba(255,255,255,0.8); padding: 8px; border-radius: 8px; z-index: 1000;">
@@ -1334,14 +1108,6 @@
   <p>Calories: <span id="runCalories">0</span></p>
 </div>
 
-<div id="eventRunStats" style="display: none; position: absolute; top: 10px; right: 10px; background: rgba(255,255,255,0.8); padding: 8px; border-radius: 8px; z-index: 1000;">
-  <p>Time: <span id="eventRunTime">00:00:00</span></p>
-  <p>Speed: <span id="eventRunSpeed">0</span> km/h</p>
-  <p>Distance: <span id="eventRunDistance">0</span> m</p>
-  <p>Pace: <span id="eventRunPace">0</span> min/km</p>
-  <p>Calories: <span id="eventRunCalories">0</span></p>
-</div>
-
 <div id="runSummary" style="display: none; position: absolute; top: 10%; left: 5%; right: 5%; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 0 10px rgba(0,0,0,0.3); z-index: 1000;">
   <h2>Run Summary</h2>
   <p><strong>Time:</strong> <span id="summaryTime">--</span></p>
@@ -1350,16 +1116,6 @@
   <p><strong>Calories:</strong> <span id="summaryCalories">--</span></p>
   <div id="summaryMap" style="height: 200px; margin-top: 15px;"></div>
   <button onclick="closeRunSummary()">Close</button>
-</div>
-
-<div id="eventRunSummary" style="display: none; position: absolute; top: 10%; left: 5%; right: 5%; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 0 10px rgba(0,0,0,0.3); z-index: 1000;">
-  <h2>Event Run Summary</h2>
-  <p><strong>Time:</strong> <span id="eventSummaryTime">--</span></p>
-  <p><strong>Distance:</strong> <span id="eventSummaryDistance">--</span> m</p>
-  <p><strong>Avg Pace:</strong> <span id="eventSummaryPace">--</span> min/km</p>
-  <p><strong>Calories:</strong> <span id="eventSummaryCalories">--</span></p>
-  <div id="eventSummaryMap" style="height: 200px; margin-top: 15px;"></div>
-  <button onclick="closeEventRunSummary()">Close</button>
 </div>
 
 <div id="countdownOverlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); color: white; font-size: 64px; font-weight: bold; align-items: center; justify-content: center; z-index: 2000;">
