@@ -100,16 +100,10 @@ export default function UserProfileScreen({ navigation, username, userId, onLogo
   useEffect(() => {
     const getUserTracks = async () => {
       try {
-        const response = await fetchWithAuth(
+        const data = await fetchWithAuth(
           `https://runfuncionapp.azurewebsites.net/api/getUsersTracks?userId=${encodeURIComponent(userId)}`
         );
-        console.log('getUsersTracks response status:', response.status);
         
-        if(!response.ok) {
-          throw new Error('Failed to fetch tracks');
-        }
-        
-        const data = await response.json();
         console.log('getUsersTracks raw data:', data);
         console.log('Number of tracks received:', data.length);
         
