@@ -1,0 +1,163 @@
+import React, { useState, useEffect } from 'react';
+import {
+    StyleSheet,
+    View,
+    Text,
+    FlatList,
+    TouchableOpacity,
+    ActivityIndicator,
+    Alert,
+  } from 'react-native';
+import { fetchWithAuth } from './utils/api';
+
+
+const EventItem = ({ event }) => (
+    <View style={styles.runItem}>
+      <View style={styles.runHeader}>
+        <Text style={styles.runDate}>{event.name || 'Some Event'}</Text>
+        <Text style={styles.runType}>{event.type}</Text>
+      </View>
+      <View style={styles.runDetails}>
+        <View style={styles.detailItem}>
+          <Text style={styles.detailLabel}>Start Time</Text>
+          <Text style={styles.detailValue}>{new Date(event.start_time).toLocaleDateString()}</Text>
+        </View>
+        <View style={styles.detailItem}>
+          <Text style={styles.detailLabel}>Status</Text>
+          <Text style={styles.detailValue}>{event.status}</Text>
+        </View>
+        <View style={styles.detailItem}>
+          <Text style={styles.detailLabel}>Difficulty</Text>
+          <Text style={styles.detailValue}>{event.difficulty}</Text>
+        </View>
+      </View>
+    </View>
+);
+
+
+export default function FutureEvents({ navigation }) {
+    const [events, setEvents] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const getUserFutureEvents = async () => {
+            try {
+                console.log("Fetching future events for authenticated user");
+                const data = await fetchWithAuth(
+                    `https://runfuncionapp.azurewebsites.net/api/getUsersFutureEvents`
+                );
+                setEvents(data);
+                console.log('Got users future events:', data);
+            } catch (error) {
+                console.error('Error fetching future events:', error);
+                Alert.alert(
+                    'Error',
+                    'Failed to load your future events. Please try again later.'
+                );
+            } finally {
+                setIsLoading(false);
+            }
+        }
+        
+        getUserFutureEvents();
+    }, []);
+
+    if (isLoading) {
+        return (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#007AFF" />
+          </View>
+        );
+    }
+
+    return (
+        <FlatList
+            data={events}
+            renderItem={({ item }) => <EventItem event={item} />}
+            keyExtractor={item => item.eventId}
+            contentContainerStyle={styles.listContainer}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>Not registered to upcoming events</Text>
+                <Text style={styles.emptySubtext}>Join or create events to see your future events here!</Text>
+            </View>
+            }
+        />
+    )
+}
+
+const styles = StyleSheet.create({
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    listContainer: {
+      padding: 16,
+    },
+    runItem: {
+      backgroundColor: 'white',
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 12,
+      shadowColor: '#000',
+      shadowOffset: {
+        width: 0,
+        height: 2,
+      },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    runHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 12,
+    },
+    runDate: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: '#333',
+    },
+    runType: {
+      fontSize: 14,
+      color: '#007AFF',
+      fontWeight: '500',
+    },
+    runDetails: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: 8,
+    },
+    detailItem: {
+      flex: 1,
+    },
+    detailLabel: {
+      fontSize: 12,
+      color: '#666',
+      marginBottom: 4,
+    },
+    detailValue: {
+      fontSize: 14,
+      color: '#333',
+      fontWeight: '500',
+    },
+    emptyContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+    },
+    emptyText: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: '#333',
+      marginBottom: 8,
+    },
+    emptySubtext: {
+      fontSize: 14,
+      color: '#666',
+      textAlign: 'center',
+    },
+});
