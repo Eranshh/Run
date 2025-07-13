@@ -321,7 +321,7 @@
                 view: 'Auto',
                 authOptions: {
                     authType: 'subscriptionKey',
-                    subscriptionKey: 'BSDCG4i6BIsimtM5jNRtCupaIm4boJb8WM92OhKd3jL6x14l3W6mJQQJ99BEACi5YpzPSPD9AAAgAZMP337x',
+                    subscriptionKey: '=e',
                 }
             });
 
@@ -360,7 +360,7 @@
                                 }
                                 const marker = new atlas.HtmlMarker({
                                     position: [longitude, latitude],
-                                    text: '!'
+                                    text: '🏁'
                                 });
                                 
                                 // Store eventId on the marker object itself
@@ -405,7 +405,7 @@
                             if (!window.userMarker) {
                                 window.userMarker = new atlas.HtmlMarker({
                                     position: [location.coords.longitude, location.coords.latitude],
-                                    text: 'U',
+                                    text: '👤',
                                     color: 'green'
                                 });
                                 map.markers.add(window.userMarker);
@@ -513,6 +513,7 @@
             tempMarker = new atlas.HtmlMarker({
                 position: center,
                 draggable: false,
+                text: '📍',
                 color: 'DodgerBlue',
                 visible: true
             });
@@ -688,7 +689,7 @@
         try{
             const marker = new atlas.HtmlMarker({
                 position: path[0],
-                text: 'T',
+                text: '🛤️',
                 color: 'orange',
                 visible: false
             });
@@ -1200,7 +1201,7 @@
                 if (runner.userId !== currentUserId) { // Use userId for filtering
                     const marker = new atlas.HtmlMarker({
                         position: [runner.longitude, runner.latitude],
-                        text: '🏃',
+                        text: '🏃‍♂️',
                         color: 'red'
                     });
                     eventRunnerMarkers.set(runner.userId, marker);
@@ -1217,7 +1218,7 @@
                 // Create new marker for this runner
                 marker = new atlas.HtmlMarker({
                     position: [positionData.longitude, positionData.latitude],
-                    text: '🏃',
+                    text: '🏃‍♂️',
                     color: 'red'
                 });
                 eventRunnerMarkers.set(positionData.userId, marker);

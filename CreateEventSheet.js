@@ -1,16 +1,20 @@
 // CreateEventSheet.js
-import React, { useMemo, useState,useEffect } from 'react';
-import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
+import React, { useMemo, useState, useEffect } from 'react';
+import { View, Text, TextInput, Button, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { Picker } from '@react-native-picker/picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
-const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, location, webRef, selectedTrack, tracks, setMode }, ref) => {
+const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, location, webRef, selectedTrack, tracks, setMode, onClose }, ref) => {
   const snapPoints = useMemo(() => ['25%', '75%'], []);
   
   const [formValues, setFormValues] = useState({ track: null });
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
-  const [startTime, setStartTime] = useState('');
+  const [startDate, setStartDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [tempDate, setTempDate] = useState(new Date()); // Holds date part before picking time on Android
   const [name, setName] = useState('');
   const [status, setStatus] = useState('open');
   const [difficulty, setDifficulty] = useState('beginner');
@@ -40,7 +44,7 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
     setMode("selectingTrack");
   };
   const handleSubmit = () => {
-    if (!latitude || !longitude || !startTime) {
+    if (!latitude || !longitude || !startDate) {
       alert('Please fill in all fields');
       return;
     }
@@ -48,7 +52,7 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
     const event = {
       latitude: parseFloat(latitude),
       longitude: parseFloat(longitude),
-      startTime: Number(startTime),
+      startTime: startDate.getTime(),
       status,
       difficulty,
       trackId: track,
@@ -60,12 +64,13 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
     setName('');
     setLatitude('');
     setLongitude('');
-    setStartTime('');
+    setStartDate(new Date());
     setStatus('open');
     setDifficulty('beginner');
     setTrack('free run');
 
     ref.current?.close();
+    setMode("mainMap");
   };
 
   return (
@@ -78,10 +83,12 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
           // Optional: reset fields on close
           setLatitude('');
           setLongitude('');
-          setStartTime('');
+          setStartDate(new Date());
           setStatus('open');
           setDifficulty('beginner');
           setTrack('free run');
+          setMode("mainMap");
+          onClose?.();
         }}
       >
       <BottomSheetView style={styles.container}>
@@ -92,28 +99,6 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
           value={name}
           onChangeText={setName}
           keyboardType="text"
-          style={styles.input}
-        />
-
-        <TextInput
-          placeholder="Longitude"
-          value={longitude}
-          onChangeText={setLongitude}
-          keyboardType="numeric"
-          style={styles.input}
-        />
-        <TextInput
-          placeholder="Latitude"
-          value={latitude}
-          onChangeText={setLatitude}
-          keyboardType="numeric"
-          style={styles.input}
-        />
-        <TextInput
-          placeholder="Start Time"
-          value={startTime}
-          onChangeText={setStartTime}
-          keyboardType="numeric"
           style={styles.input}
         />
 
@@ -162,7 +147,68 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
           onPress={handleSelectTrackFromMap}
         />
         <Button title="Submit" onPress={handleSubmit} />
-        <Button title="Close" onPress={() => ref.current?.close()} />
+        <Button title="Close" onPress={() => { ref.current?.close(); setMode("mainMap"); onClose?.(); }} />
+
+        {/* Start Date & Time Picker */}
+        <TouchableOpacity onPress={() => {
+          if (Platform.OS === 'android') {
+            // On Android we show date first then time
+            setShowDatePicker(true);
+          } else {
+            setShowDatePicker(true);
+          }
+        }} style={styles.dateInput}>
+          <Text>{startDate ? startDate.toLocaleString() : 'Select Start Time'}</Text>
+        </TouchableOpacity>
+        {/* Date picker */}
+        {showDatePicker && (
+          <DateTimePicker
+            value={tempDate}
+            mode={Platform.OS === 'ios' ? 'datetime' : 'date'}
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            onChange={(event, selectedDate) => {
+              if (event.type === 'dismissed') {
+                setShowDatePicker(false);
+                return;
+              }
+              if (selectedDate) {
+                if (Platform.OS === 'android') {
+                  // Save date part and open time picker
+                  setTempDate(selectedDate);
+                  setShowDatePicker(false);
+                  setShowTimePicker(true);
+                } else {
+                  // iOS returns full datetime
+                  setStartDate(selectedDate);
+                  setShowDatePicker(false);
+                }
+              }
+            }}
+          />
+        )}
+        {/* Time picker only for Android */}
+        {showTimePicker && Platform.OS === 'android' && (
+          <DateTimePicker
+            value={tempDate}
+            mode="time"
+            display="default"
+            onChange={(event, selectedTime) => {
+              if (event.type === 'dismissed') {
+                setShowTimePicker(false);
+                return;
+              }
+              if (selectedTime) {
+                // Combine selected date and time
+                const newDate = new Date(tempDate);
+                newDate.setHours(selectedTime.getHours());
+                newDate.setMinutes(selectedTime.getMinutes());
+                newDate.setSeconds(0);
+                setStartDate(newDate);
+              }
+              setShowTimePicker(false);
+            }}
+          />
+        )}
       </BottomSheetView>
     </BottomSheet>
   );
@@ -190,5 +236,12 @@ const styles = StyleSheet.create({
   picker: {
     height: 50,
     width: '100%',
+  },
+  dateInput: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 10,
+    justifyContent: 'center'
   },
 });
