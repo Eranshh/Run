@@ -590,11 +590,13 @@ const getAllTracks = async () => {
   const openEventSheet = () => {
     sheetRef.current?.snapToIndex(1);
     setIsSheetVisible(true); // show sheet
+    setMode("creatingEvent"); // Hide floating buttons
   };
   const handleSubmitEvent = (event) => {
     createEvent(event);
     sheetRef.current?.snapToIndex(-1);
     setIsSheetVisible(false); // hide sheet
+    setMode("mainMap"); // Restore floating buttons
   };
 
   const openEventDisplay = () => {
@@ -857,8 +859,9 @@ const getAllTracks = async () => {
         } else if (data.data.action === "confirmLocation") {
           console.log("Location confirmed:", data.data.location);
           setSelectedLocation(data.data.location);
-          setMode("mainMap");
-          // Reopen sheet
+          // Show the event creation sheet again and hide FABs
+          setIsSheetVisible(true);
+          setMode("creatingEvent");
           sheetRef.current?.snapToIndex(1);
         } else if (data.data.action === 'trackSelected') {
           console.log('Track selected:', data.data.trackId, ' Longitude: ', data.data.location.longitude, ' Latitude: ' , data.data.location.latitude);
@@ -962,7 +965,7 @@ const getAllTracks = async () => {
             selectedTrack={selectedTrack}
             tracks={tracks}
             setMode={setMode}
-            onClose={() => setIsSheetVisible(false)}
+            onClose={() => { setIsSheetVisible(false); setMode("mainMap"); }}
           />
         )}
         {isEventDisplayVisible && (
