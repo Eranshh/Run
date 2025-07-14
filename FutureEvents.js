@@ -11,8 +11,18 @@ import {
 import { fetchWithAuth } from './utils/api';
 
 
-const EventItem = ({ event }) => (
-    <View style={styles.runItem}>
+const EventItem = ({ event, onPress, expanded, participants, loadingParticipants }) => {
+  // Prepare participants list with host first
+  let fullParticipants = [];
+  if (expanded) {
+    const host = { userId: event.trainerId, isHost: true };
+    // Avoid duplicate if host is in participants (shouldn't be, but just in case)
+    const filtered = (participants || []).filter(p => p.userId !== event.trainerId);
+    fullParticipants = [host, ...filtered];
+  }
+
+  return (
+    <TouchableOpacity style={styles.runItem} onPress={() => onPress(event)}>
       <View style={styles.runHeader}>
         <Text style={styles.runDate}>{event.name || 'Some Event'}</Text>
         <Text style={styles.runType}>{event.type}</Text>
@@ -31,13 +41,56 @@ const EventItem = ({ event }) => (
           <Text style={styles.detailValue}>{event.difficulty}</Text>
         </View>
       </View>
-    </View>
-);
+      {expanded && (
+        <View style={styles.participantsContainer}>
+          <Text style={styles.participantsTitle}>Participants:</Text>
+          {loadingParticipants ? (
+            <ActivityIndicator size="small" color="#007AFF" />
+          ) : fullParticipants && fullParticipants.length > 0 ? (
+            fullParticipants.map((p, idx) => (
+              <Text key={p.userId || idx} style={styles.participantName}>
+                {p.isHost ? '👑 ' : ''}{p.userId}
+              </Text>
+            ))
+          ) : (
+            <Text style={styles.noParticipants}>No participants found.</Text>
+          )}
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+};
 
 
 export default function FutureEvents({ navigation }) {
     const [events, setEvents] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [expandedEventId, setExpandedEventId] = useState(null);
+    const [participantsByEvent, setParticipantsByEvent] = useState({});
+    const [loadingParticipantsId, setLoadingParticipantsId] = useState(null);
+
+    const handleEventPress = async (event) => {
+      if (expandedEventId === event.eventId) {
+        setExpandedEventId(null);
+        return;
+      }
+      setExpandedEventId(event.eventId);
+      if (!participantsByEvent[event.eventId]) {
+        setLoadingParticipantsId(event.eventId);
+        try {
+          const data = await fetchWithAuth(
+            `https://runfuncionapp.azurewebsites.net/api/getEventRegisteredUsers?eventId=${event.eventId}`
+          );
+          console.log('Got event participants:', data);
+          setParticipantsByEvent(prev => ({ ...prev, [event.eventId]: data }));
+        } catch (error) {
+          setParticipantsByEvent(prev => ({ ...prev, [event.eventId]: [] }));
+          Alert.alert('Error', 'Failed to load participants.');
+        } finally {
+          setLoadingParticipantsId(null);
+        }
+      }
+    }
 
     useEffect(() => {
         const getUserFutureEvents = async () => {
@@ -73,7 +126,15 @@ export default function FutureEvents({ navigation }) {
     return (
         <FlatList
             data={events}
-            renderItem={({ item }) => <EventItem event={item} />}
+            renderItem={({ item }) => (
+              <EventItem
+                event={item}
+                onPress={handleEventPress}
+                expanded={expandedEventId === item.eventId}
+                participants={participantsByEvent[item.eventId]}
+                loadingParticipants={loadingParticipantsId === item.eventId}
+              />
+            )}
             keyExtractor={item => item.eventId}
             contentContainerStyle={styles.listContainer}
             showsVerticalScrollIndicator={false}
@@ -159,5 +220,27 @@ const styles = StyleSheet.create({
       fontSize: 14,
       color: '#666',
       textAlign: 'center',
+    },
+    participantsContainer: {
+      marginTop: 16,
+      padding: 12,
+      backgroundColor: '#F3F8FF',
+      borderRadius: 8,
+    },
+    participantsTitle: {
+      fontWeight: '600',
+      fontSize: 15,
+      marginBottom: 8,
+      color: '#007AFF',
+    },
+    participantName: {
+      fontSize: 14,
+      color: '#333',
+      marginBottom: 4,
+    },
+    noParticipants: {
+      fontSize: 13,
+      color: '#999',
+      fontStyle: 'italic',
     },
 });
