@@ -1,10 +1,16 @@
-import React, { useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import React, { useRef, useEffect, useState } from 'react';
+import { View, Text, StyleSheet, Dimensions, ActivityIndicator, Alert } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { fetchWithAuth } from './utils/api';
 
 export default function RunSummaryScreen({ route }) {
   const { run, track } = route.params;
   const webViewRef = useRef(null);
+
+  // Add state for participants
+  const [participants, setParticipants] = useState([]);
+  const [loadingParticipants, setLoadingParticipants] = useState(false);
+  const [participantsError, setParticipantsError] = useState(null);
 
   // Add logging to see what data we're getting
   console.log('RunSummaryScreen - Run data:', run);
@@ -35,6 +41,26 @@ export default function RunSummaryScreen({ route }) {
     }
   };
 
+  // Fetch participants if eventId exists
+  useEffect(() => {
+    if (run.eventId) {
+      setLoadingParticipants(true);
+      setParticipantsError(null);
+      fetchWithAuth(`https://runfuncionapp.azurewebsites.net/api/getEventRegisteredUsers?eventId=${run.eventId}`)
+        .then(data => {
+          // Prepend host
+          const host = { userId: run.trainerId, isHost: true };
+          const filtered = (data || []).filter(p => p.userId !== run.trainerId);
+          setParticipants([host, ...filtered]);
+        })
+        .catch(err => {
+          setParticipants([]);
+          setParticipantsError('Failed to load participants.');
+        })
+        .finally(() => setLoadingParticipants(false));
+    }
+  }, [run.eventId]);
+
   useEffect(() => {
     // Also try sending the path when the component mounts
     if (track && track.path) {
@@ -62,6 +88,25 @@ export default function RunSummaryScreen({ route }) {
         <View style={styles.statRow}><Text style={styles.statLabel}>🏷️ Type:</Text><Text style={styles.statValue}>{run.type}</Text></View>
         <View style={styles.statRow}><Text style={styles.statLabel}>🗺️ Route:</Text><Text style={styles.statValue}>{run.route}</Text></View>
       </View>
+      {/* Participant List */}
+      {run.eventId && (
+        <View style={styles.participantsContainer}>
+          <Text style={styles.participantsTitle}>Participants:</Text>
+          {loadingParticipants ? (
+            <ActivityIndicator size="small" color="#007AFF" />
+          ) : participantsError ? (
+            <Text style={styles.noParticipants}>{participantsError}</Text>
+          ) : participants && participants.length > 0 ? (
+            participants.map((p, idx) => (
+              <Text key={p.userId || idx} style={styles.participantName}>
+                {p.isHost ? '👑 ' : ''}{p.userId}
+              </Text>
+            ))
+          ) : (
+            <Text style={styles.noParticipants}>No participants found.</Text>
+          )}
+        </View>
+      )}
       {track && track.path ? (
         <WebView
           ref={webViewRef}
@@ -138,5 +183,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 12,
-  }
+  },
+  participantsContainer: {
+    marginBottom: 18,
+    padding: 12,
+    backgroundColor: '#F3F8FF',
+    borderRadius: 8,
+  },
+  participantsTitle: {
+    fontWeight: '600',
+    fontSize: 15,
+    marginBottom: 8,
+    color: '#007AFF',
+  },
+  participantName: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 4,
+  },
+  noParticipants: {
+    fontSize: 13,
+    color: '#999',
+    fontStyle: 'italic',
+  },
 }); 
