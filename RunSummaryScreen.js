@@ -1,10 +1,19 @@
-import React, { useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import React, { useRef, useEffect, useState } from 'react';
+import { View, Text, StyleSheet, Dimensions, ActivityIndicator, Alert } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { fetchWithAuth } from './utils/api';
 
 export default function RunSummaryScreen({ route }) {
   const { run, track } = route.params;
   const webViewRef = useRef(null);
+
+  // Add state for event details and participants
+  const [eventDetails, setEventDetails] = useState(null);
+  const [loadingEvent, setLoadingEvent] = useState(false);
+  const [eventError, setEventError] = useState(null);
+  const [participants, setParticipants] = useState([]);
+  const [loadingParticipants, setLoadingParticipants] = useState(false);
+  const [participantsError, setParticipantsError] = useState(null);
 
   // Add logging to see what data we're getting
   console.log('RunSummaryScreen - Run data:', run);
@@ -35,6 +44,52 @@ export default function RunSummaryScreen({ route }) {
     }
   };
 
+  // Fetch event details if eventId exists
+  useEffect(() => {
+    if (run.eventId) {
+      setLoadingEvent(true);
+      setEventError(null);
+      fetchWithAuth(`https://runfuncionapp.azurewebsites.net/api/getEventById?eventId=${run.eventId}`)
+        .then(data => {
+          setEventDetails(data);
+        })
+        .catch(err => {
+          setEventDetails(null);
+          setEventError('Failed to load event details.');
+          console.log('Error fetching event details:', err);
+        })
+        .finally(() => setLoadingEvent(false));
+    }
+  }, [run.eventId]);
+
+  // Fetch participants if eventId exists
+  useEffect(() => {
+    if (run.eventId) {
+      setLoadingParticipants(true);
+      setParticipantsError(null);
+      fetchWithAuth(`https://runfuncionapp.azurewebsites.net/api/getEventRegisteredUsers?eventId=${run.eventId}`)
+        .then(data => {
+          setParticipants(data || []);
+        })
+        .catch(err => {
+          setParticipants([]);
+          setParticipantsError('Failed to load participants.');
+          console.log('Error fetching event participants:', err);
+        })
+        .finally(() => setLoadingParticipants(false));
+    }
+  }, [run.eventId]);
+
+  // Compose full participants list with host first (from eventDetails.trainerId)
+  let fullParticipants = [];
+  if (eventDetails && eventDetails.trainerId) {
+    const host = { userId: eventDetails.trainerId, isHost: true };
+    const filtered = (participants || []).filter(p => p.userId !== eventDetails.trainerId);
+    fullParticipants = [host, ...filtered];
+  } else {
+    fullParticipants = participants || [];
+  }
+
   useEffect(() => {
     // Also try sending the path when the component mounts
     if (track && track.path) {
@@ -62,6 +117,29 @@ export default function RunSummaryScreen({ route }) {
         <View style={styles.statRow}><Text style={styles.statLabel}>🏷️ Type:</Text><Text style={styles.statValue}>{run.type}</Text></View>
         <View style={styles.statRow}><Text style={styles.statLabel}>🗺️ Route:</Text><Text style={styles.statValue}>{run.route}</Text></View>
       </View>
+      {/* Participant List */}
+      {run.eventId && (
+        <View style={styles.participantsContainer}>
+          <Text style={styles.participantsTitle}>Participants:</Text>
+          {loadingEvent ? (
+            <ActivityIndicator size="small" color="#007AFF" />
+          ) : eventError ? (
+            <Text style={styles.noParticipants}>{eventError}</Text>
+          ) : loadingParticipants ? (
+            <ActivityIndicator size="small" color="#007AFF" />
+          ) : participantsError ? (
+            <Text style={styles.noParticipants}>{participantsError}</Text>
+          ) : fullParticipants && fullParticipants.length > 0 ? (
+            fullParticipants.map((p, idx) => (
+              <Text key={p.userId || idx} style={styles.participantName}>
+                {p.isHost ? '👑 ' : ''}{p.userId}
+              </Text>
+            ))
+          ) : (
+            <Text style={styles.noParticipants}>No participants found.</Text>
+          )}
+        </View>
+      )}
       {track && track.path ? (
         <WebView
           ref={webViewRef}
@@ -138,5 +216,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 12,
-  }
+  },
+  participantsContainer: {
+    marginBottom: 18,
+    padding: 12,
+    backgroundColor: '#F3F8FF',
+    borderRadius: 8,
+  },
+  participantsTitle: {
+    fontWeight: '600',
+    fontSize: 15,
+    marginBottom: 8,
+    color: '#007AFF',
+  },
+  participantName: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 4,
+  },
+  noParticipants: {
+    fontSize: 13,
+    color: '#999',
+    fontStyle: 'italic',
+  },
 }); 
