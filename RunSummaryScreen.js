@@ -7,7 +7,10 @@ export default function RunSummaryScreen({ route }) {
   const { run, track } = route.params;
   const webViewRef = useRef(null);
 
-  // Add state for participants
+  // Add state for event details and participants
+  const [eventDetails, setEventDetails] = useState(null);
+  const [loadingEvent, setLoadingEvent] = useState(false);
+  const [eventError, setEventError] = useState(null);
   const [participants, setParticipants] = useState([]);
   const [loadingParticipants, setLoadingParticipants] = useState(false);
   const [participantsError, setParticipantsError] = useState(null);
@@ -41,6 +44,24 @@ export default function RunSummaryScreen({ route }) {
     }
   };
 
+  // Fetch event details if eventId exists
+  useEffect(() => {
+    if (run.eventId) {
+      setLoadingEvent(true);
+      setEventError(null);
+      fetchWithAuth(`https://runfuncionapp.azurewebsites.net/api/getEventById?eventId=${run.eventId}`)
+        .then(data => {
+          setEventDetails(data);
+        })
+        .catch(err => {
+          setEventDetails(null);
+          setEventError('Failed to load event details.');
+          console.log('Error fetching event details:', err);
+        })
+        .finally(() => setLoadingEvent(false));
+    }
+  }, [run.eventId]);
+
   // Fetch participants if eventId exists
   useEffect(() => {
     if (run.eventId) {
@@ -48,18 +69,26 @@ export default function RunSummaryScreen({ route }) {
       setParticipantsError(null);
       fetchWithAuth(`https://runfuncionapp.azurewebsites.net/api/getEventRegisteredUsers?eventId=${run.eventId}`)
         .then(data => {
-          // Prepend host
-          const host = { userId: run.trainerId, isHost: true };
-          const filtered = (data || []).filter(p => p.userId !== run.trainerId);
-          setParticipants([host, ...filtered]);
+          setParticipants(data || []);
         })
         .catch(err => {
           setParticipants([]);
           setParticipantsError('Failed to load participants.');
+          console.log('Error fetching event participants:', err);
         })
         .finally(() => setLoadingParticipants(false));
     }
   }, [run.eventId]);
+
+  // Compose full participants list with host first (from eventDetails.trainerId)
+  let fullParticipants = [];
+  if (eventDetails && eventDetails.trainerId) {
+    const host = { userId: eventDetails.trainerId, isHost: true };
+    const filtered = (participants || []).filter(p => p.userId !== eventDetails.trainerId);
+    fullParticipants = [host, ...filtered];
+  } else {
+    fullParticipants = participants || [];
+  }
 
   useEffect(() => {
     // Also try sending the path when the component mounts
@@ -92,12 +121,16 @@ export default function RunSummaryScreen({ route }) {
       {run.eventId && (
         <View style={styles.participantsContainer}>
           <Text style={styles.participantsTitle}>Participants:</Text>
-          {loadingParticipants ? (
+          {loadingEvent ? (
+            <ActivityIndicator size="small" color="#007AFF" />
+          ) : eventError ? (
+            <Text style={styles.noParticipants}>{eventError}</Text>
+          ) : loadingParticipants ? (
             <ActivityIndicator size="small" color="#007AFF" />
           ) : participantsError ? (
             <Text style={styles.noParticipants}>{participantsError}</Text>
-          ) : participants && participants.length > 0 ? (
-            participants.map((p, idx) => (
+          ) : fullParticipants && fullParticipants.length > 0 ? (
+            fullParticipants.map((p, idx) => (
               <Text key={p.userId || idx} style={styles.participantName}>
                 {p.isHost ? '👑 ' : ''}{p.userId}
               </Text>
