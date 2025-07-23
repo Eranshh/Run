@@ -3,6 +3,7 @@ import { useWindowDimensions } from 'react-native';
 import { TabView } from 'react-native-tab-view';
 import RunHistory from './RunHistory'
 import FutureEvents from './FutureEvents';
+import FriendsScreen from './FriendsScreen';
 
 
 export default function userProfileTabs({ navigation, userId }) {
@@ -12,6 +13,7 @@ export default function userProfileTabs({ navigation, userId }) {
     const routes = [
         { key: 'History', title: 'History' },
         { key: 'Future Events', title: 'Future Events' },
+        { key: 'Friends', title: 'Friends' },
     ];
 
     const renderScene = ({ route }) => {
@@ -23,6 +25,10 @@ export default function userProfileTabs({ navigation, userId }) {
                         />
             case 'Future Events':
                 return <FutureEvents
+                        navigation={navigation}
+                        />
+            case 'Friends':
+                return <FriendsScreen
                         navigation={navigation}
                         />
             default: return

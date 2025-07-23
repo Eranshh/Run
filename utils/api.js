@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_TIMEOUT = 15000; // 15 seconds
 const MAX_RETRIES = 3;
+const API_URL = 'https://runfuncionapp.azurewebsites.net/api';
 
 const fetchWithRetry = async (url, options = {}) => {
   let lastError;
@@ -55,14 +56,14 @@ export const fetchWithAuth = async (url, options = {}) => {
 
 // New API functions for event ready status
 export const setEventReady = async (eventId) => {
-  return fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/setEventReady', {
+  return fetchWithAuth(`${API_URL}/setEventReady`, {
     method: 'POST',
     body: JSON.stringify({ eventId }),
   });
 };
 
 export const markUserReady = async (eventId, userId) => {
-  return fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/markUserReady', {
+  return fetchWithAuth(`${API_URL}/markUserReady`, {
     method: 'POST',
     body: JSON.stringify({ eventId, userId }),
   });
@@ -70,19 +71,19 @@ export const markUserReady = async (eventId, userId) => {
 
 export const getEventReadyUsers = async (eventId) => {
   return fetchWithAuth(
-    `https://runfuncionapp.azurewebsites.net/api/getEventReadyUsers?eventId=${encodeURIComponent(eventId)}`
+    `${API_URL}/getEventReadyUsers?eventId=${encodeURIComponent(eventId)}`
   );
 };
 
 export const startEvent = async (eventId, userId) => {
-  return fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/startEvent', {
+  return fetchWithAuth(`${API_URL}/startEvent`, {
     method: 'POST',
     body: JSON.stringify({ eventId, userId }),
   });
 };
 
 export const updateRunnerPosition = async (eventId, userId, latitude, longitude, speed, heading, distance, elapsedTime) => {
-  return fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/updateRunnerPosition', {
+  return fetchWithAuth(`${API_URL}/updateRunnerPosition`, {
     method: 'POST',
     body: JSON.stringify({ 
       eventId, 
@@ -98,11 +99,11 @@ export const updateRunnerPosition = async (eventId, userId, latitude, longitude,
 };
 
 export const getEventRunnersPositions = async (eventId) => {
-  return fetchWithAuth(`https://runfuncionapp.azurewebsites.net/api/getEventRunnersPositions?eventId=${encodeURIComponent(eventId)}`);
+  return fetchWithAuth(`${API_URL}/getEventRunnersPositions?eventId=${encodeURIComponent(eventId)}`);
 };
 
 export const endEventRun = async (eventId, userId, totalDistance, totalDuration, totalCalories, averagePace, averageSpeed, path) => {
-  return fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/endEventRun', {
+  return fetchWithAuth(`${API_URL}/endEventRun`, {
     method: 'POST',
     body: JSON.stringify({ 
       eventId, 
@@ -118,7 +119,7 @@ export const endEventRun = async (eventId, userId, totalDistance, totalDuration,
 };
 
 export const leaveEvent = async (eventId, leavingUserId, requestingUserId) => {
-  return fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/leaveEvent', {
+  return fetchWithAuth(`${API_URL}/leaveEvent`, {
     method: 'POST',
     body: JSON.stringify({ 
       eventId, 
@@ -126,4 +127,40 @@ export const leaveEvent = async (eventId, leavingUserId, requestingUserId) => {
       requestingUserId 
     }),
   });
+}; 
+
+export const sendFriendRequest = async (addressee_id) => {
+  return fetchWithAuth(`${API_URL}/friend-requests`, {
+    method: 'POST',
+    body: JSON.stringify({ addressee_id }),
+  });
+};
+
+export const getFriends = async () => {
+  return fetchWithAuth(`${API_URL}/friends`);
+};
+
+export const getFriendRequests = async () => {
+  return fetchWithAuth(`${API_URL}/friend-requests`);
+};
+
+export const respondToFriendRequest = async (request_id, status) => {
+  return fetchWithAuth(`${API_URL}/friend-requests/${request_id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ status }),
+  });
+};
+
+export const removeFriend = async (friend_user_id) => {
+  return fetchWithAuth(`${API_URL}/friends/${friend_user_id}`, {
+    method: 'DELETE',
+  });
+};
+
+export const searchUsers = async (search_query) => {
+  return fetchWithAuth(`${API_URL}/users?search=${encodeURIComponent(search_query)}`);
+}; 
+
+export const getUser = async (userId) => {
+  return fetchWithAuth(`${API_URL}/getUser?userId=${encodeURIComponent(userId)}`);
 }; 

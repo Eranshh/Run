@@ -18,6 +18,7 @@ import UserProfileScreen from './UserProfileScreen';
 import { fetchWithAuth, setEventReady, markUserReady, getEventReadyUsers, startEvent, updateRunnerPosition, getEventRunnersPositions, endEventRun, leaveEvent } from './utils/api';
 import RunSummaryScreen from './RunSummaryScreen';
 import SelectTrackScreen from './SelectTrackScreen';
+import UserSearchScreen from './UserSearchScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -1178,6 +1179,20 @@ export default function App() {
                 />
               )}
             </Stack.Screen>
+            <Stack.Screen
+              name="UserSearch"
+              component={UserSearchScreen}
+              options={{
+                title: 'Search for Users',
+                headerStyle: {
+                  backgroundColor: '#007AFF',
+                },
+                headerTintColor: '#fff',
+                headerTitleStyle: {
+                  fontWeight: 'bold',
+                },
+              }}
+            />
           </>
         )}
       </Stack.Navigator>
