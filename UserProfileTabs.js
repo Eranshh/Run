@@ -6,7 +6,7 @@ import FutureEvents from './FutureEvents';
 import FriendsScreen from './FriendsScreen';
 
 
-export default function userProfileTabs({ navigation, userId }) {
+export default function userProfileTabs({ navigation, userId, profileId }) {
     const layout = useWindowDimensions();
     const [index, setIndex] = useState(0);
 
@@ -30,6 +30,8 @@ export default function userProfileTabs({ navigation, userId }) {
             case 'Friends':
                 return <FriendsScreen
                         navigation={navigation}
+                        userId={userId}
+                        profileId={profileId}
                         />
             default: return
         }

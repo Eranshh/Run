@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, TextInput, Button, FlatList, Text, StyleSheet, Alert } from 'react-native';
 import { searchUsers, sendFriendRequest } from './utils/api';
 
-export default function UserSearchScreen() {
+export default function UserSearchScreen({ navigation }) {
   const [query, setQuery] = useState('');
   const [users, setUsers] = useState([]);
 
@@ -16,19 +16,14 @@ export default function UserSearchScreen() {
     }
   };
 
-  const handleAddFriend = async (addressee_id) => {
-    try {
-      await sendFriendRequest(addressee_id);
-      Alert.alert('Success', 'Friend request sent.');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to send friend request.');
-    }
-  };
+  const handleViewProfile = (id) => {
+    navigation.navigate('UserProfile', { profileId: id });
+  }
 
   const renderItem = ({ item }) => (
     <View style={styles.item}>
       <Text>{item.userId}</Text>
-      <Button title="Add Friend" onPress={() => handleAddFriend(item.userId)} />
+      <Button title="View profile" onPress={() => handleViewProfile(item.userId)} />
     </View>
   );
 

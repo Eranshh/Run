@@ -815,7 +815,7 @@ const getAllTracks = async () => {
           //console.log("sending location");
           getUserLocation();
         } else if (data.data.action === "navigateToProfile") {
-          navigation.navigate('UserProfile');
+          navigation.navigate('UserProfile', { profileId: userId });
         } else if (data.data.action === "confirmLocation") {
           console.log("Location confirmed:", data.data.location);
           setSelectedLocation(data.data.location);
@@ -1181,7 +1181,6 @@ export default function App() {
             </Stack.Screen>
             <Stack.Screen
               name="UserSearch"
-              component={UserSearchScreen}
               options={{
                 title: 'Search for Users',
                 headerStyle: {
@@ -1192,7 +1191,13 @@ export default function App() {
                   fontWeight: 'bold',
                 },
               }}
-            />
+            >
+              {props => (
+                <UserSearchScreen
+                  {...props}
+                />
+              )}
+            </Stack.Screen>
           </>
         )}
       </Stack.Navigator>

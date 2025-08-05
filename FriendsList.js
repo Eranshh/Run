@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, Button, Alert } from 'react-native';
 import { getFriends, removeFriend, getUser } from './utils/api';
 
-export default function FriendsList() {
+export default function FriendsList({ navigation }) {
   const [friends, setFriends] = useState([]);
 
   useEffect(() => {
@@ -36,9 +36,14 @@ export default function FriendsList() {
     }
   };
 
+  const handleViewProfile = (friendId) => {
+    navigation.navigate('UserProfile', { profileId: friendId });
+  }
+
   const renderItem = ({ item }) => (
     <View style={styles.item}>
       <Text>{item.userId}</Text>
+      <Button title="View Profile" onPress={() => handleViewProfile(item.friend_id)} />
       <Button title="Remove" onPress={() => handleRemoveFriend(item.friend_id)} />
     </View>
   );

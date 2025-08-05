@@ -6,15 +6,15 @@ import FriendRequests from './FriendRequests';
 
 const Tab = createMaterialTopTabNavigator();
 
-export default function FriendsScreen({ navigation }) {
+export default function FriendsScreen({ navigation, userId, profileId }) {
   return (
     <View style={{ flex: 1 }}>
-      <Button
+      {userId === profileId && <Button
         title="Search for Users"
         onPress={() => navigation.navigate('UserSearch')}
-      />
+      />}
       <Tab.Navigator>
-        <Tab.Screen name="Friends" component={FriendsList} />
+        <Tab.Screen name="Friends" component={FriendsList} navigation={navigation} />
         <Tab.Screen name="Requests" component={FriendRequests} />
       </Tab.Navigator>
     </View>

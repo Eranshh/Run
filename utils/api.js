@@ -164,3 +164,7 @@ export const searchUsers = async (search_query) => {
 export const getUser = async (userId) => {
   return fetchWithAuth(`${API_URL}/getUser?userId=${encodeURIComponent(userId)}`);
 }; 
+
+export const getFriendshipStatus = async (targetId) => {
+  return fetchWithAuth(`${API_URL}/friendship-status?userId=${encodeURIComponent(targetId)}`);
+};
