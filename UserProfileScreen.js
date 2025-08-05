@@ -18,17 +18,20 @@ import { CommonActions } from '@react-navigation/native';
 
 export default function UserProfileScreen({ navigation, username, userId, onLogout }) {
   const [friendshipStatus, setFriendshipStatus] = useState(null);
+  const [isLoading, setLoading] = useState(true);
   const route = useRoute();
   const profileId = route.params.profileId;
 
   useEffect(() => {
     const fetchFriendshipStatus = async () => {
+      setLoading(true);
       try {
         if (userId === profileId) {
           return;
         }
         const fsStatus = await getFriendshipStatus(profileId);
         setFriendshipStatus(fsStatus.status);
+        setLoading(false);
       }
       catch (error) {
         console.log('Failed to fetch friendship status:', error);
@@ -77,6 +80,10 @@ export default function UserProfileScreen({ navigation, username, userId, onLogo
     }
   };
 
+  const handleNothing = () => {
+    return;
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -89,7 +96,13 @@ export default function UserProfileScreen({ navigation, username, userId, onLogo
         >
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>}
-        {userId !== profileId && <TouchableOpacity
+        {userId !== profileId && isLoading && <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={handleNothing}
+        >
+          <Text style={styles.logoutText}>Loading...</Text>
+        </TouchableOpacity>}
+        {userId !== profileId && !isLoading && <TouchableOpacity
           style={styles.logoutButton}
           onPress={handleFriendshipButton}
         >

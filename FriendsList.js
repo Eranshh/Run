@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, Button, Alert } from 'react-native';
 import { getFriends, removeFriend, getUser } from './utils/api';
 
-export default function FriendsList({ navigation }) {
+export default function FriendsList({ navigation, userId, profileId }) {
   const [friends, setFriends] = useState([]);
 
   useEffect(() => {
@@ -11,7 +11,7 @@ export default function FriendsList({ navigation }) {
 
   const fetchFriends = async () => {
     try {
-      const friendsData = await getFriends();
+      const friendsData = await getFriends(profileId);
       
       const friendsWithDetails = await Promise.all(
         friendsData.map(async (friend) => {
@@ -21,6 +21,7 @@ export default function FriendsList({ navigation }) {
       );
 
       setFriends(friendsWithDetails);
+      console.log('Got friends for the list:', friends);
     } catch (error) {
       Alert.alert('Error', 'Failed to fetch friends.', error);
       console.log('Failed to fetch friends:', error);
@@ -44,7 +45,7 @@ export default function FriendsList({ navigation }) {
     <View style={styles.item}>
       <Text>{item.userId}</Text>
       <Button title="View Profile" onPress={() => handleViewProfile(item.friend_id)} />
-      <Button title="Remove" onPress={() => handleRemoveFriend(item.friend_id)} />
+      {userId === profileId && <Button title="Remove" onPress={() => handleRemoveFriend(item.friend_id)} />}
     </View>
   );
 

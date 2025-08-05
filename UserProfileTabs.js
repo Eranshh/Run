@@ -22,10 +22,12 @@ export default function userProfileTabs({ navigation, userId, profileId }) {
                 return <RunHistory
                         navigation={navigation}
                         userId={userId}
+                        profileId={profileId}
                         />
             case 'Future Events':
                 return <FutureEvents
                         navigation={navigation}
+                        profileId={profileId}
                         />
             case 'Friends':
                 return <FriendsScreen

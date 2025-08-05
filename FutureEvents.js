@@ -62,7 +62,7 @@ const EventItem = ({ event, onPress, expanded, participants, loadingParticipants
 };
 
 
-export default function FutureEvents({ navigation }) {
+export default function FutureEvents({ navigation, profileId }) {
     const [events, setEvents] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [expandedEventId, setExpandedEventId] = useState(null);
@@ -93,11 +93,11 @@ export default function FutureEvents({ navigation }) {
     }
 
     useEffect(() => {
-        const getUserFutureEvents = async () => {
+        const getUserFutureEvents = async (id) => {
             try {
                 console.log("Fetching future events for authenticated user");
                 const data = await fetchWithAuth(
-                    `https://runfuncionapp.azurewebsites.net/api/getUsersFutureEvents`
+                    `https://runfuncionapp.azurewebsites.net/api/getUsersFutureEvents?id=${encodeURIComponent(id)}`
                 );
                 setEvents(data);
                 console.log('Got users future events:', data);
@@ -112,8 +112,8 @@ export default function FutureEvents({ navigation }) {
             }
         }
         
-        getUserFutureEvents();
-    }, []);
+        getUserFutureEvents(profileId);
+    }, [profileId]);
 
     if (isLoading) {
         return (

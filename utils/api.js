@@ -136,8 +136,11 @@ export const sendFriendRequest = async (addressee_id) => {
   });
 };
 
-export const getFriends = async () => {
-  return fetchWithAuth(`${API_URL}/friends`);
+export const getFriends = async (id=null) => {
+  if (id === null) {
+    return fetchWithAuth(`${API_URL}/friends`);
+  }
+  return fetchWithAuth(`${API_URL}/friends?id=${encodeURIComponent(id)}`);
 };
 
 export const getFriendRequests = async () => {

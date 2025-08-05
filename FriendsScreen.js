@@ -13,10 +13,11 @@ export default function FriendsScreen({ navigation, userId, profileId }) {
         title="Search for Users"
         onPress={() => navigation.navigate('UserSearch')}
       />}
-      <Tab.Navigator>
-        <Tab.Screen name="Friends" component={FriendsList} navigation={navigation} />
+      {userId === profileId && <Tab.Navigator>
+        <Tab.Screen name="Friends" component={FriendsList} navigation={navigation} userId={userId} profileId={profileId} />
         <Tab.Screen name="Requests" component={FriendRequests} />
-      </Tab.Navigator>
+      </Tab.Navigator>}
+      {userId !== profileId && <FriendsList navigation={navigation} userId={userId} profileId={profileId} />}
     </View>
   );
 } 
