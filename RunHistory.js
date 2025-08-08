@@ -50,7 +50,7 @@ const RunItem = ({ run, onPress }) => (
   </TouchableOpacity>
 );
 
-export default function RunHistory({ navigation, userId }) {
+export default function RunHistory({ navigation, userId, profileId }) {
     const [runs, setRuns] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [userTracks, setUserTracks] = useState([]);
@@ -69,9 +69,9 @@ export default function RunHistory({ navigation, userId }) {
     useEffect(() => {
         const getUserRuns = async () => {
           try {
-            console.log("Fetching runs for user:", userId);
+            console.log("Fetching runs for user:", profileId);
             const data = await fetchWithAuth(
-              `https://runfuncionapp.azurewebsites.net/api/getUsersActivities?userId=${encodeURIComponent(userId)}`
+              `https://runfuncionapp.azurewebsites.net/api/getUsersActivities?userId=${encodeURIComponent(profileId)}`
             );
             setRuns(data);
           } catch (error) {
@@ -86,13 +86,13 @@ export default function RunHistory({ navigation, userId }) {
         };
     
         getUserRuns();
-    }, [userId]);
+    }, [profileId]);
     
     useEffect(() => {
         const getUserTracks = async () => {
           try {
             const data = await fetchWithAuth(
-              `https://runfuncionapp.azurewebsites.net/api/getUsersTracks?userId=${encodeURIComponent(userId)}`
+              `https://runfuncionapp.azurewebsites.net/api/getUsersTracks?userId=${encodeURIComponent(profileId)}`
             );
             
             console.log('getUsersTracks raw data:', data);
@@ -114,7 +114,7 @@ export default function RunHistory({ navigation, userId }) {
           }
         };
         getUserTracks();
-    }, [userId]);
+    }, [profileId]);
     
     if (isLoading) {
         return (
@@ -134,7 +134,7 @@ export default function RunHistory({ navigation, userId }) {
             ListEmptyComponent={
             <View style={styles.emptyContainer}>
                 <Text style={styles.emptyText}>No runs recorded yet</Text>
-                <Text style={styles.emptySubtext}>Start running to see your history here!</Text>
+                {userId === profileId && <Text style={styles.emptySubtext}>Start running to see your history here!</Text>}
             </View>
             }
         />

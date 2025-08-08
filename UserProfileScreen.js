@@ -9,16 +9,36 @@ import {
   SafeAreaView,
   Alert,
 } from 'react-native';
+import { useRoute } from '@react-navigation/native';
 import UserProfileTabs from './UserProfileTabs'
-import { fetchWithAuth } from './utils/api';
+import { getFriendshipStatus, sendFriendRequest, removeFriend } from './utils/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CommonActions } from '@react-navigation/native';
 
 
 export default function UserProfileScreen({ navigation, username, userId, onLogout }) {
-  const [runs, setRuns] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [userTracks, setUserTracks] = useState([]);
+  const [friendshipStatus, setFriendshipStatus] = useState(null);
+  const [isLoading, setLoading] = useState(true);
+  const route = useRoute();
+  const profileId = route.params.profileId;
+
+  useEffect(() => {
+    const fetchFriendshipStatus = async () => {
+      setLoading(true);
+      try {
+        if (userId === profileId) {
+          return;
+        }
+        const fsStatus = await getFriendshipStatus(profileId);
+        setFriendshipStatus(fsStatus.status);
+        setLoading(false);
+      }
+      catch (error) {
+        console.log('Failed to fetch friendship status:', error);
+      }
+    }
+    fetchFriendshipStatus();
+  }, [friendshipStatus, profileId])
 
   const handleLogout = async () => {
     try {
@@ -29,24 +49,71 @@ export default function UserProfileScreen({ navigation, username, userId, onLogo
     }
   };
 
+  const handleAddFriend = async (addressee_id) => {
+    try {
+      await sendFriendRequest(addressee_id);
+      Alert.alert('Success', 'Friend request sent.');
+      setFriendshipStatus('pending');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to send friend request.');
+    }
+  };
+
+  const handleRemoveFriend = async (friendId) => {
+    try {
+      await removeFriend(friendId);
+      setFriendshipStatus(null);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to remove friend.');
+    }
+  };
+
+  const handleFriendshipButton = () => {
+    if (friendshipStatus === null) {
+      handleAddFriend(profileId);
+    }
+    else if (friendshipStatus === 'accepted') {
+      handleRemoveFriend(profileId);
+    }
+    else {
+      return;
+    }
+  };
+
+  const handleNothing = () => {
+    return;
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerContent}>
-          <Text style={styles.username}>{username}</Text>
-          <Text style={styles.subtitle}>Run History</Text>
+          <Text style={styles.username}>{profileId}</Text>
         </View>
-        <TouchableOpacity 
+        {userId === profileId && <TouchableOpacity 
           style={styles.logoutButton}
           onPress={handleLogout}
         >
           <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
+        </TouchableOpacity>}
+        {userId !== profileId && isLoading && <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={handleNothing}
+        >
+          <Text style={styles.logoutText}>Loading...</Text>
+        </TouchableOpacity>}
+        {userId !== profileId && !isLoading && <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={handleFriendshipButton}
+        >
+          <Text style={styles.logoutText}>{!friendshipStatus ? 'Add Friend' : (friendshipStatus === 'accepted' ? 'Remove Friend' : 'Request Pending')}</Text>
+        </TouchableOpacity>}
       </View>
       
       <UserProfileTabs
         navigation={navigation}
         userId={userId}
+        profileId={profileId}
       />
     </SafeAreaView>
   );

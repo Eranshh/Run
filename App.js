@@ -18,6 +18,7 @@ import UserProfileScreen from './UserProfileScreen';
 import { fetchWithAuth, setEventReady, markUserReady, getEventReadyUsers, startEvent, updateRunnerPosition, getEventRunnersPositions, endEventRun, leaveEvent } from './utils/api';
 import RunSummaryScreen from './RunSummaryScreen';
 import SelectTrackScreen from './SelectTrackScreen';
+import UserSearchScreen from './UserSearchScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -814,7 +815,7 @@ const getAllTracks = async () => {
           //console.log("sending location");
           getUserLocation();
         } else if (data.data.action === "navigateToProfile") {
-          navigation.navigate('UserProfile');
+          navigation.navigate('UserProfile', { profileId: userId });
         } else if (data.data.action === "confirmLocation") {
           console.log("Location confirmed:", data.data.location);
           setSelectedLocation(data.data.location);
@@ -1175,6 +1176,25 @@ export default function App() {
                   {...props}
                   username={username}
                   userId={userId}
+                />
+              )}
+            </Stack.Screen>
+            <Stack.Screen
+              name="UserSearch"
+              options={{
+                title: 'Search for Users',
+                headerStyle: {
+                  backgroundColor: '#007AFF',
+                },
+                headerTintColor: '#fff',
+                headerTitleStyle: {
+                  fontWeight: 'bold',
+                },
+              }}
+            >
+              {props => (
+                <UserSearchScreen
+                  {...props}
                 />
               )}
             </Stack.Screen>
