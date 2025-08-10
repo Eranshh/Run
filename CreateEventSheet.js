@@ -1,21 +1,34 @@
 // CreateEventSheet.js
-import React, { useMemo, useState,useEffect } from 'react';
-import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
+import React, { useMemo, useState,useEffect, useRef } from 'react';
+import { View, Text, TextInput, Button, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { Picker } from '@react-native-picker/picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
-const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, location, webRef, selectedTrack, tracks, setMode }, ref) => {
+const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, location, webRef, selectedTrack, tracks, setMode, onClose, visible }, ref) => {
   const snapPoints = useMemo(() => ['25%', '75%'], []);
   
   const [formValues, setFormValues] = useState({ track: null });
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
-  const [startTime, setStartTime] = useState('');
+  const [startDateTime, setStartDateTime] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [name, setName] = useState('');
   const [status, setStatus] = useState('open');
   const [difficulty, setDifficulty] = useState('beginner');
   const [track, setTrack] = useState('free run');
+  const preserveOnCloseRef = useRef(false);
 
+  const resetFields = () => {
+    setName('');
+    setLatitude('');
+    setLongitude('');
+    setStartDateTime(new Date());
+    setStatus('open');
+    setDifficulty('beginner');
+    setTrack('free run');
+  };
 
   useEffect(() => {
     if (location) {
@@ -31,16 +44,45 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
     }
   }, [selectedTrack]);
 
+  const openDateTimePicker = () => {
+    setShowDatePicker(true);
+  };
+
+  const onChangeDate = (_event, selected) => {
+    setShowDatePicker(false);
+    if (selected) {
+      const withDate = new Date(selected);
+      // Preserve previously chosen time
+      withDate.setHours(startDateTime.getHours(), startDateTime.getMinutes(), 0, 0);
+      setStartDateTime(withDate);
+    }
+    // For Android, show time picker next
+    if (Platform.OS === 'android') {
+      setShowTimePicker(true);
+    }
+  };
+
+  const onChangeTime = (_event, selected) => {
+    setShowTimePicker(false);
+    if (selected) {
+      const updated = new Date(startDateTime);
+      updated.setHours(selected.getHours(), selected.getMinutes(), 0, 0);
+      setStartDateTime(updated);
+    }
+  };
+
   const handleSelectTrackFromMap = () => {
     // Close sheet and initiate selection
+    preserveOnCloseRef.current = true;
     ref.current?.close(); // Close the sheet
     webRef.current?.postMessage(JSON.stringify(
       { type: 'startTrackSelection' }
     ));
     setMode("selectingTrack");
+    onClose?.();
   };
   const handleSubmit = () => {
-    if (!latitude || !longitude || !startTime) {
+    if (!latitude || !longitude || !startDateTime) {
       alert('Please fill in all fields');
       return;
     }
@@ -48,7 +90,7 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
     const event = {
       latitude: parseFloat(latitude),
       longitude: parseFloat(longitude),
-      startTime: Number(startTime),
+      startTime: startDateTime.getTime(),
       status,
       difficulty,
       trackId: track,
@@ -57,31 +99,25 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
 
     onSubmit?.(event);
      // Reset fields
-    setName('');
-    setLatitude('');
-    setLongitude('');
-    setStartTime('');
-    setStatus('open');
-    setDifficulty('beginner');
-    setTrack('free run');
+    resetFields();
 
     ref.current?.close();
+    onClose?.();
   };
 
   return (
     <BottomSheet
         ref={ref}
-        index={0}
+        index={visible ? 1 : -1}
         snapPoints={snapPoints}
         enablePanDownToClose={true} // This enables swipe-down to close
         onClose={() => {
-          // Optional: reset fields on close
-          setLatitude('');
-          setLongitude('');
-          setStartTime('');
-          setStatus('open');
-          setDifficulty('beginner');
-          setTrack('free run');
+          // Reset fields only if not preserving across map selection
+          if (!preserveOnCloseRef.current) {
+            resetFields();
+          }
+          preserveOnCloseRef.current = false;
+          onClose?.();
         }}
       >
       <BottomSheetView style={styles.container}>
@@ -95,27 +131,27 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
           style={styles.input}
         />
 
-        <TextInput
-          placeholder="Longitude"
-          value={longitude}
-          onChangeText={setLongitude}
-          keyboardType="numeric"
-          style={styles.input}
-        />
-        <TextInput
-          placeholder="Latitude"
-          value={latitude}
-          onChangeText={setLatitude}
-          keyboardType="numeric"
-          style={styles.input}
-        />
-        <TextInput
-          placeholder="Start Time"
-          value={startTime}
-          onChangeText={setStartTime}
-          keyboardType="numeric"
-          style={styles.input}
-        />
+        {/* Hidden longitude/latitude fields retained in state via location effect */}
+
+        <TouchableOpacity onPress={openDateTimePicker} style={styles.input}>
+          <Text>{startDateTime ? startDateTime.toLocaleString() : 'Select Start Time'}</Text>
+        </TouchableOpacity>
+        {showDatePicker && (
+          <DateTimePicker
+            value={startDateTime || new Date()}
+            mode={Platform.OS === 'ios' ? 'datetime' : 'date'}
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            onChange={onChangeDate}
+          />
+        )}
+        {showTimePicker && (
+          <DateTimePicker
+            value={startDateTime || new Date()}
+            mode="time"
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            onChange={onChangeTime}
+          />
+        )}
 
         <Text>Status</Text>
         <Picker
@@ -153,8 +189,10 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
         <Button
           title="Select Location"
           onPress={() => {
+            preserveOnCloseRef.current = true;
             ref.current?.close(); // Close the sheet
             onSelectLocation();   // Notify parent to enter map-pinning mode
+            onClose?.();
           }}
         />
         <Button
@@ -162,7 +200,7 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
           onPress={handleSelectTrackFromMap}
         />
         <Button title="Submit" onPress={handleSubmit} />
-        <Button title="Close" onPress={() => ref.current?.close()} />
+        <Button title="Close" onPress={() => { preserveOnCloseRef.current = false; ref.current?.close(); onClose?.(); }} />
       </BottomSheetView>
     </BottomSheet>
   );

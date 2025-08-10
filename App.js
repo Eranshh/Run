@@ -820,8 +820,8 @@ const getAllTracks = async () => {
           console.log("Location confirmed:", data.data.location);
           setSelectedLocation(data.data.location);
           setMode("mainMap");
-          // Reopen sheet
-          sheetRef.current?.snapToIndex(1);
+          // Reopen sheet properly
+          openEventSheet();
         } else if (data.data.action === 'trackSelected') {
           console.log('Track selected:', data.data.trackId, ' Longitude: ', data.data.location.longitude, ' Latitude: ' , data.data.location.latitude);
           const selectedTrackId = data.data.trackId;
@@ -900,29 +900,28 @@ const getAllTracks = async () => {
         }}
         onMessage={handleWebViewMessage}
         />
-        {mode === "mainMap" && (
+        {mode === "mainMap" && !isSheetVisible && (
           <TouchableOpacity id="createEventBtn" style={styles.fab} onPress={openEventSheet}>
             <Text style={styles.fabText}>+</Text>
           </TouchableOpacity>
         )}
-        {mode === "mainMap" && (
+        {mode === "mainMap" && !isSheetVisible && (
           <TouchableOpacity id="startFreeRunBtn" style={styles.freeRunBtn} onPress={navigateToSelectTrack}>
             <Text style={styles.fabText}>🏃</Text>
           </TouchableOpacity>
         )}
-        {isSheetVisible && (
-          <CreateEventSheet
-            ref={sheetRef}
-            onSubmit={handleSubmitEvent}
-            onSelectLocation={handleSelectLocation}
-            location={selectedLocation}
-            webRef={webViewRef}
-            selectedTrack={selectedTrack}
-            tracks={tracks}
-            setMode={setMode}
-            onClose={() => setIsSheetVisible(false)}
-          />
-        )}
+        <CreateEventSheet
+          ref={sheetRef}
+          onSubmit={handleSubmitEvent}
+          onSelectLocation={handleSelectLocation}
+          location={selectedLocation}
+          webRef={webViewRef}
+          selectedTrack={selectedTrack}
+          tracks={tracks}
+          setMode={setMode}
+          onClose={() => setIsSheetVisible(false)}
+          visible={isSheetVisible}
+        />
         {isEventDisplayVisible && (
           <CreateEventDisplay
             ref={eventDisplayRef}
