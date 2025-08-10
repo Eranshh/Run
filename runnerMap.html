@@ -269,6 +269,56 @@
         .logout-button:hover {
             background: #fff0f0 !important;
         }
+
+        #legendOverlay {
+             position: fixed;
+             top: 20px;
+             left: 20px;
+             background: rgba(255, 255, 255, 0.95);
+             padding: 10px 12px;
+             border-radius: 8px;
+             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+             z-index: 1000;
+             font-size: 14px;
+             line-height: 1.5;
+             max-width: 280px;
+             color: #333;
+         }
+
+        #legendOverlay h4 {
+            margin-top: 0;
+            margin-bottom: 5px;
+            color: #0078D4;
+        }
+        #legendOverlay .legend-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        #legendOverlay .close-btn {
+            background: transparent;
+            border: none;
+            color: #666;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        #legendOverlay p {
+            margin-bottom: 3px;
+        }
+
+        #legendOverlay .icon-description {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 3px;
+        }
+
+        #legendOverlay .icon-description .icon {
+            font-size: 20px;
+            color: #0078D4;
+        }
     </style>
 
     <script>
@@ -299,6 +349,8 @@
                 // Wait a short moment to ensure the camera is settled
                 window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'mapReady'}}));
                 window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'getEvents'}}));
+                const legend = document.getElementById('legendOverlay');
+                if (legend) legend.style.display = 'block';
                 window.document.addEventListener('message', function(event) {
                     try {
                         const data = JSON.parse(event.data);
@@ -329,7 +381,8 @@
                                 }
                                 const marker = new atlas.HtmlMarker({
                                     position: [longitude, latitude],
-                                    text: '!'
+                                    text: '📍',
+                                    color: '#0078D4'
                                 });
                                 
                                 // Store eventId on the marker object itself
@@ -372,8 +425,8 @@
                             if (!window.userMarker) {
                                 window.userMarker = new atlas.HtmlMarker({
                                     position: [location.coords.longitude, location.coords.latitude],
-                                    text: 'U',
-                                    color: 'green'
+                                    text: '🧍',
+                                    color: '#2ecc71'
                                 });
                                 map.markers.add(window.userMarker);
                             } else {
@@ -623,8 +676,8 @@
         try{
             const marker = new atlas.HtmlMarker({
                 position: path[0],
-                text: 'T',
-                color: 'orange',
+                text: '🏁',
+                color: '#e67e22',
                 visible: false
             });
             marker.trackId = track.trackId; // <-- store the track ID here
@@ -731,6 +784,8 @@
                     document.getElementById('pauseRunBtn').style.display = 'inline';
                     document.getElementById('stopRunBtn').style.display = 'inline';
                     document.getElementById('runStats').style.display = 'block';
+                    const legend = document.getElementById('legendOverlay');
+                    if (legend) legend.style.display = 'none';
 
                     if (!runDataSource) {
                         runDataSource = new atlas.source.DataSource();
@@ -805,6 +860,8 @@
             document.getElementById('pauseRunBtn').style.display = 'none';
             document.getElementById('stopRunBtn').style.display = 'none';
             document.getElementById('runStats').style.display = 'none';
+            const legend = document.getElementById('legendOverlay');
+            if (legend) legend.style.display = 'block';
 
             console.log('Run complete. Total path:', runPath);
             if (runTimerInterval) {
@@ -988,7 +1045,7 @@
                     const marker = new atlas.HtmlMarker({
                         position: [runner.longitude, runner.latitude],
                         text: '🏃',
-                        color: 'red'
+                        color: '#e74c3c'
                     });
                     eventRunnerMarkers.set(runner.userId, marker);
                     map.markers.add(marker);
@@ -1005,7 +1062,7 @@
                 marker = new atlas.HtmlMarker({
                     position: [positionData.longitude, positionData.latitude],
                     text: '🏃',
-                    color: 'red'
+                    color: '#e74c3c'
                 });
                 eventRunnerMarkers.set(positionData.userId, marker);
                 map.markers.add(marker);
@@ -1121,6 +1178,15 @@
 <div id="countdownOverlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); color: white; font-size: 64px; font-weight: bold; align-items: center; justify-content: center; z-index: 2000;">
   <div id="countdownText">3</div>
 </div>
+
+<div id="legendOverlay" style="display: none; position: fixed; top: 70px; left: 20px; background: rgba(255, 255, 255, 0.95); padding: 10px 12px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); z-index: 1000; font-size: 14px; line-height: 1.5; max-width: 280px; color: #333;">
+    <div class="legend-header"><h4 style="margin:0;">Map Legend</h4><button class="close-btn" onclick="(function(){document.getElementById('legendOverlay').style.display='none';})()">✕</button></div>
+    <p><span class="icon-description"><span class="icon">📍</span>Event Location</span></p>
+    <p><span class="icon-description"><span class="icon">🧍</span>Your Location</span></p>
+    <p><span class="icon-description"><span class="icon">🏃</span>Runner</span></p>
+    <p><span class="icon-description"><span class="icon">🏁</span>Track Start/Finish</span></p>
+    <p><span class="icon-description"><span class="icon">🔗</span>Track Path</span></p>
+  </div>
 
 </body>
 </html>

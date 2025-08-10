@@ -7,10 +7,21 @@
   <link rel="stylesheet" href="https://atlas.microsoft.com/sdk/javascript/mapcontrol/3/atlas.min.css" />
   <style>
     html, body, #map { width: 100%; height: 100%; margin: 0; padding: 0; }
+    #legendOverlay { position: fixed; top: 20px; left: 20px; background: rgba(255,255,255,0.95); padding: 10px 12px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); z-index: 1000; font-size: 14px; line-height: 1.5; color: #333; }
+    #legendOverlay h4 { margin: 0 0 6px 0; color: #0078D4; }
+    #legendOverlay .icon-description { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+    #legendOverlay .legend-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    #legendOverlay .close-btn { background: transparent; border: none; color: #666; font-size: 16px; cursor: pointer; }
   </style>
 </head>
 <body>
   <div id="map"></div>
+  <div id="legendOverlay">
+    <div class="legend-header"><h4>Map Legend</h4><button class="close-btn" onclick="(function(){document.getElementById('legendOverlay').style.display='none';})()">✕</button></div>
+    <div class="icon-description"><span>🔰</span><span>Start</span></div>
+    <div class="icon-description"><span>🏁</span><span>Finish</span></div>
+    <div class="icon-description"><span style="display:inline-block;width:14px;height:4px;background:#3498db;border-radius:2px;"></span><span>Route</span></div>
+  </div>
   <script>
     let map;
     let summaryLineSource = null;
@@ -70,8 +81,8 @@
       window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Adding start marker at: ' + JSON.stringify(path[0])}}));
       const startMarker = new atlas.HtmlMarker({
         position: path[0],
-        text: 'S',
-        color: 'green'
+        text: '🔰',
+        color: '#2ecc71'
       });
       map.markers.add(startMarker);
       summaryStartMarker = startMarker;
@@ -82,8 +93,8 @@
         window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Adding finish marker at: ' + JSON.stringify(path[path.length-1])}}));
         const finishMarker = new atlas.HtmlMarker({
           position: path[path.length-1],
-          text: 'F',
-          color: 'red'
+          text: '🏁',
+          color: '#e74c3c'
         });
         map.markers.add(finishMarker);
         window.summaryFinishMarker = finishMarker;
@@ -103,7 +114,7 @@
       window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Feature added to DataSource'}}));
 
       const lineLayer = new atlas.layer.LineLayer(dataSource, null, {
-        strokeColor: 'blue',
+        strokeColor: '#3498db',
         strokeWidth: 4
       });
       map.layers.add(lineLayer);
