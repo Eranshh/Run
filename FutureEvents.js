@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
+    Button,
     StyleSheet,
     View,
     Text,
@@ -11,7 +12,7 @@ import {
 import { fetchWithAuth } from './utils/api';
 
 
-const EventItem = ({ event, onPress, expanded, participants, loadingParticipants }) => {
+const EventItem = ({ event, onPress, expanded, participants, loadingParticipants, openEvent }) => {
   // Prepare participants list with host first
   let fullParticipants = [];
   if (expanded) {
@@ -55,6 +56,7 @@ const EventItem = ({ event, onPress, expanded, participants, loadingParticipants
           ) : (
             <Text style={styles.noParticipants}>No participants found.</Text>
           )}
+          <Button title={'Go To'} onPress={() => openEvent(event.eventId)}/>
         </View>
       )}
     </TouchableOpacity>
@@ -90,6 +92,10 @@ export default function FutureEvents({ navigation, profileId }) {
           setLoadingParticipantsId(null);
         }
       }
+    }
+
+    function openEvent(id) {
+      navigation.navigate('EventScreen', {'eventId': id});
     }
 
     useEffect(() => {
@@ -133,6 +139,7 @@ export default function FutureEvents({ navigation, profileId }) {
                 expanded={expandedEventId === item.eventId}
                 participants={participantsByEvent[item.eventId]}
                 loadingParticipants={loadingParticipantsId === item.eventId}
+                openEvent={openEvent}
               />
             )}
             keyExtractor={item => item.eventId}
