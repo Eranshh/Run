@@ -4,11 +4,6 @@ import { useRoute } from '@react-navigation/native';
 import { fetchWithAuth, leaveEvent, joinEvent, deleteEvent, setEventReady, markUserReady, startEvent } from './utils/api';
 import { WebView } from 'react-native-webview';
 
-//======================================================
-// TO DO:
-// # Add a webview to show the location if no track
-//======================================================
-
 export default function EventScreen({ navigation, userId, connection }) {
     const [isLoading, setIsLoading] = useState(true);
     const [listenersUp, setListenersUp] = useState(false);
