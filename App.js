@@ -359,6 +359,13 @@ const getAllTracks = async () => {
 
   const createTrack = async (track) => {
     console.log("Creating track:", track);
+    
+    // Validate track data before making API call
+    if (!track || !Array.isArray(track) || track.length === 0) {
+      console.error('Cannot create track: Invalid or empty track data');
+      return null;
+    }
+    
     try {
       const data = await fetchWithAuth(
         'https://runfuncionapp.azurewebsites.net/api/createTrack',
@@ -382,6 +389,13 @@ const getAllTracks = async () => {
 
   const createActivity = async (activity) => {
     console.log("Logging run to database:", activity);
+    
+    // Validate that the activity has a valid path
+    if (!activity.path || !Array.isArray(activity.path) || activity.path.length === 0) {
+      console.error('Cannot create activity: Invalid or empty path');
+      return;
+    }
+    
     activity.userId = userId;
     let track_id = await createTrack(activity.path);
     if (!track_id) {

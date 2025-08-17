@@ -770,6 +770,18 @@
                     clearInterval(countdownInterval);
                     overlay.style.display = 'none';
 
+                    // Check if GPS is available before starting run
+                    if (!navigator.geolocation) {
+                        console.error('Geolocation is not supported by this browser');
+                        window.ReactNativeWebView.postMessage(JSON.stringify({
+                            data: {
+                                action: 'log',
+                                message: 'Geolocation is not supported by this browser'
+                            }
+                        }));
+                        return;
+                    }
+
                     runActive = true;
                     runPaused = false;
                     runPath = [];
@@ -922,7 +934,33 @@
                 if (currentEventRun.trackId) activity.trackId = currentEventRun.trackId;
             }
 
-            createActivity(activity, runPath);
+            // Validate that we have a valid path before creating activity
+            if (runPath && runPath.length >= 2) {
+                // Check if the run has meaningful distance (at least 10 meters)
+                if (totalDistance >= 10) {
+                    createActivity(activity, runPath);
+                    // Show success message
+                    showRunStatusMessage('Run saved successfully!', 'success');
+                } else {
+                    console.warn('Cannot create activity: Run distance too short (less than 10 meters)');
+                    showRunStatusMessage('Run too short to save (minimum 10 meters)', 'warning');
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                        data: {
+                            action: 'log',
+                            message: 'Cannot create activity: Run distance too short (less than 10 meters)'
+                        }
+                    }));
+                }
+            } else {
+                console.warn('Cannot create activity: Empty or invalid run path');
+                showRunStatusMessage('No GPS data recorded - run not saved', 'error');
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                    data: {
+                        action: 'log',
+                        message: 'Cannot create activity: Empty or invalid run path'
+                    }
+                }));
+            }
 
             if (runType === 'event') {
                 window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'endEventRun'}}));
@@ -1139,6 +1177,43 @@
             }));
         }
 
+        function showRunStatusMessage(message, type) {
+            // Remove existing message if any
+            const existingMessage = document.getElementById('runStatusMessage');
+            if (existingMessage) {
+                existingMessage.remove();
+            }
+
+            // Create message element
+            const messageDiv = document.createElement('div');
+            messageDiv.id = 'runStatusMessage';
+            messageDiv.textContent = message;
+            messageDiv.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: ${type === 'success' ? '#28a745' : type === 'warning' ? '#ffc107' : '#dc3545'};
+                color: white;
+                padding: 15px 20px;
+                border-radius: 8px;
+                font-size: 16px;
+                font-weight: bold;
+                z-index: 3000;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                text-align: center;
+                max-width: 300px;
+            `;
+
+            document.body.appendChild(messageDiv);
+
+            // Auto-remove after 3 seconds
+            setTimeout(() => {
+                if (messageDiv.parentNode) {
+                    messageDiv.remove();
+                }
+            }, 3000);
+        }
     </script>
 </head>
 <body onload="getMap()">
