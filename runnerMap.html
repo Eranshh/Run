@@ -810,9 +810,12 @@
         function runLoc(location){
             if (!runActive || runPaused) return;
 
-            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Run location updated with coords: ' + JSON.stringify(location.coords)}}));
-            const { latitude, longitude, speed, heading } = location.coords;
-            const point = [longitude, latitude];
+            const { latitude, longitude, altitude, speed, heading } = location.coords;
+            
+            // Filter out 0 values as they usually indicate no altitude data
+            const validAltitude = (altitude && altitude !== 0 && !isNaN(altitude)) ? altitude : null;
+            
+            const point = [longitude, latitude, validAltitude];
 
             runPath.push(point);
             map.setCamera({ center: point , zoom: 20, bearing: heading ?? 0, pitch: 60 });
@@ -864,6 +867,7 @@
             if (legend) legend.style.display = 'block';
 
             console.log('Run complete. Total path:', runPath);
+            
             if (runTimerInterval) {
                 clearInterval(runTimerInterval);
                 runTimerInterval = null;

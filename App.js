@@ -300,9 +300,12 @@ function MainScreen({ navigation, username, userId, userToken, route }) {
 
         const watcher = await Location.watchPositionAsync(
           {
-            accuracy: Location.Accuracy.High,
+            accuracy: Location.Accuracy.BestForNavigation, // Try highest accuracy
             timeInterval: 2000,
             distanceInterval: 1,
+            altitude: true, // Enable altitude tracking
+            // Additional options that might help with altitude
+            mayShowUserSettingsDialog: true,
           },
           (location) => {
             if (webViewRef.current) {
@@ -737,6 +740,7 @@ const getAllTracks = async () => {
         userId: userId,
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
+        altitude: location.coords.altitude || null,
         speed: location.coords.speed || 0,
         heading: location.coords.heading || 0
       });
@@ -746,6 +750,7 @@ const getAllTracks = async () => {
         userId,
         location.coords.latitude,
         location.coords.longitude,
+        location.coords.altitude || null,
         location.coords.speed || 0,
         location.coords.heading || 0,
         0, // distance - will be calculated by the WebView

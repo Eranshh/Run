@@ -82,7 +82,7 @@ export const startEvent = async (eventId, userId) => {
   });
 };
 
-export const updateRunnerPosition = async (eventId, userId, latitude, longitude, speed, heading, distance, elapsedTime) => {
+export const updateRunnerPosition = async (eventId, userId, latitude, longitude, altitude, speed, heading, distance, elapsedTime) => {
   return fetchWithAuth(`${API_URL}/updateRunnerPosition`, {
     method: 'POST',
     body: JSON.stringify({ 
@@ -90,6 +90,7 @@ export const updateRunnerPosition = async (eventId, userId, latitude, longitude,
       userId, 
       latitude, 
       longitude, 
+      altitude, 
       speed, 
       heading, 
       distance, 
