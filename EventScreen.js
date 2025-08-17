@@ -149,7 +149,7 @@ export default function EventScreen({ navigation, userId, connection }) {
             {isLoading && <Text>Loading...</Text>}
             {!isLoading && <Text style={styles.title}>{eventTitle || 'Event Summary'}</Text>}
             {!isLoading && <View style={styles.statsCard}>
-                <View style={styles.statRow}><Text style={styles.statLabel}>📅 Date:</Text><Text style={styles.statValue}>{startTime ? new Date(startTime).toLocaleString() : 'N/A'}</Text></View>
+                <View style={styles.statRow}><Text style={styles.statLabel}>📅 Date:</Text><Text style={styles.statValue}>{startTime ? new Date(Number(startTime)).toLocaleString() : 'N/A'}</Text></View>
                 <View style={styles.statRow}><Text style={styles.statLabel}>Status:</Text><Text style={styles.statValue}>{status}</Text></View>
                 <View style={styles.statRow}><Text style={styles.statLabel}>Type:</Text><Text style={styles.statValue}>{type}</Text></View>
                 <View style={styles.statRow}><Text style={styles.statLabel}>Difficulty:</Text><Text style={styles.statValue}>{difficulty}</Text></View>

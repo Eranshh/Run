@@ -88,7 +88,7 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
     const event = {
       latitude: parseFloat(latitude),
       longitude: parseFloat(longitude),
-      startTime: startDateTime.getTime(),
+      start_time: startDateTime.getTime().toString(),
       difficulty,
       trackId: track,
       name
