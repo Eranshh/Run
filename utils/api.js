@@ -127,7 +127,29 @@ export const leaveEvent = async (eventId, leavingUserId, requestingUserId) => {
       requestingUserId 
     }),
   });
-}; 
+};
+
+export const joinEvent = async (eventId, userId) => {
+  return fetchWithAuth(`${API_URL}/joinEvent`, {
+    method: 'POST',
+    body: JSON.stringify({
+      eventId: eventId,
+      userId: userId,
+    }),
+  });
+}
+
+export const deleteEvent = async (eventId) => {
+  return fetchWithAuth(`${API_URL}/deleteEvent`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      eventId: eventId
+    }),
+  });
+}
 
 export const sendFriendRequest = async (addressee_id) => {
   return fetchWithAuth(`${API_URL}/friend-requests`, {
