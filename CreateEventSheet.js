@@ -15,7 +15,6 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [name, setName] = useState('');
-  const [status, setStatus] = useState('open');
   const [difficulty, setDifficulty] = useState('beginner');
   const [track, setTrack] = useState('free run');
   const preserveOnCloseRef = useRef(false);
@@ -25,7 +24,6 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
     setLatitude('');
     setLongitude('');
     setStartDateTime(new Date());
-    setStatus('open');
     setDifficulty('beginner');
     setTrack('free run');
   };
@@ -91,7 +89,6 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
       latitude: parseFloat(latitude),
       longitude: parseFloat(longitude),
       startTime: startDateTime.getTime(),
-      status,
       difficulty,
       trackId: track,
       name
@@ -152,17 +149,6 @@ const CreateEventSheet = React.forwardRef(({ onSubmit, onSelectLocation, locatio
             onChange={onChangeTime}
           />
         )}
-
-        <Text>Status</Text>
-        <Picker
-          selectedValue={status}
-          onValueChange={(itemValue) => setStatus(itemValue)}
-          style={styles.picker}
-        >
-          <Picker.Item label="Open" value="open" />
-          <Picker.Item label="In Progress" value="in progress" />
-          <Picker.Item label="Finished" value="finished" />
-        </Picker>
 
         <Text>Difficulty</Text>
         <Picker
