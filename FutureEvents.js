@@ -31,7 +31,7 @@ const EventItem = ({ event, onPress, expanded, participants, loadingParticipants
       <View style={styles.runDetails}>
         <View style={styles.detailItem}>
           <Text style={styles.detailLabel}>Start Time</Text>
-          <Text style={styles.detailValue}>{new Date(event.start_time).toLocaleDateString()}</Text>
+          <Text style={styles.detailValue}>{new Date(Number(event.start_time)).toLocaleDateString()}</Text>
         </View>
         <View style={styles.detailItem}>
           <Text style={styles.detailLabel}>Status</Text>
