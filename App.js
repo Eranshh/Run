@@ -9,7 +9,6 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import CreateEventSheet from './CreateEventSheet';
-import CreateEventDisplay from './CreateEventDisplay';
 import LoginScreen from './LoginScreen';
 import RegisterScreen from './RegisterScreen';
 import { get } from 'react-native/Libraries/TurboModule/TurboModuleRegistry';
@@ -19,23 +18,21 @@ import { fetchWithAuth, setEventReady, markUserReady, getEventReadyUsers, startE
 import RunSummaryScreen from './RunSummaryScreen';
 import SelectTrackScreen from './SelectTrackScreen';
 import UserSearchScreen from './UserSearchScreen';
+import EventScreen from './EventScreen';
 
 const Stack = createNativeStackNavigator();
 
 
-function MainScreen({ navigation, username, userId, userToken, route }) {
-  const [userType, setUserType] = useState(null);
-  const [connection, setConnection] = useState(null);
-  const [isSheetVisible, setIsSheetVisible] = useState(false);
-  const [selectedLocation, setSelectedLocation] = useState(null);
+function MainScreen({ navigation, username, userId, userToken, route, connection }) {
   const [tracks, setTracks] = useState([]);
   const [selectedTrack, setSelectedTrack] = useState(null);
-  const [isEventDisplayVisible, setIsEventDisplayVisible] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [selectedLocation, setSelectedLocation] = useState(null);
+  const [isSheetVisible, setIsSheetVisible] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const [mode, setMode] = useState("mainMap"); // mainMap, selectingLocation, selectingTrack, freeRun, eventRun
   const [currentEventRun, setCurrentEventRun] = useState(null); // New state for current event run
   const [eventRunners, setEventRunners] = useState([]); // New state for tracking all runners in event
+  const [listenersUp, setListenersUp] = useState(false);
 
   // Add refs to always have latest state in event handlers
   const modeRef = useRef(mode);
@@ -44,7 +41,6 @@ function MainScreen({ navigation, username, userId, userToken, route }) {
   useEffect(() => { currentEventRunRef.current = currentEventRun; }, [currentEventRun]);
 
   const webViewRef = useRef(null);
-  const eventDisplayRef = useRef(null);
   const sheetRef = useRef(null);
   const hasHandledParams = useRef(false);
 
@@ -82,208 +78,128 @@ function MainScreen({ navigation, username, userId, userToken, route }) {
   }, [route?.params]);
 
   useEffect(() => {
-    const connectToSignalR = async () => {
+    if (listenersUp || !connection) return;
+    // STEP 3: Set up listeners
+    connection.on("addEvent", () => {
+      getAllOpenEvents();
+    });
+
+    connection.on("eventDeleted", (eventId) => {
+      console.log("SignalR: Received eventDeleted", eventId);
+      getAllOpenEvents();
+    });
+
+    connection.on("eventStatusChanged", (eventId) => {
       try {
-        // STEP 1: Call backend negotiate endpoint to get URL + token
-        const res = await fetch("https://runfuncionapp.azurewebsites.net/api/negotiate");
-        if (!res.ok) throw new Error("Failed to fetch SignalR info");
-
-        const { url, accessToken } = await res.json();
-
-        // STEP 2: Use the returned info to connect
-        const signalrConnection = new SignalR.HubConnectionBuilder()
-          .withUrl(url, {
-            accessTokenFactory: () => accessToken,
-            timeout: 30000, // 30 second timeout
-          })
-          .withAutomaticReconnect([0, 2000, 5000, 10000, 30000]) // Retry after 0s, 2s, 5s, 10s, then every 30s
-          .configureLogging(SignalR.LogLevel.Information)
-          .build();
-
-        // STEP 3: Set up listeners
-        signalrConnection.on("addEvent", (message) => {
-        try {
-          console.log("Received message from SignalR:", message);
-          const event_data = typeof message === 'string' ? JSON.parse(message) : message;
-
-          console.log("Parsed event data:", event_data);
-          if (!event_data || !event_data.latitude || !event_data.longitude || !event_data.RowKey) {
-            console.warn("Invalid event data received:", event_data);
-            return;
-          }
-          // Add event to the local event list
-          eventList.events.push({
-            latitude: event_data.latitude,
-            longitude: event_data.longitude,
-            runners: [],
-            id: event_data.RowKey,
-            name: event_data.name || "Unnamed Event",
-            trackId: event_data.trackId || null,
-            startTime: event_data.start_time || 0,
-            difficulty: event_data.difficulty || "begginer",
-            type: event_data.type || "free run",
-            host: event_data.trainerId || "unknown",
-            status: event_data.status || "open",
-          });
-
-          eventList.len = (eventList.len || 0) + 1;
-
-          // Send updated list to WebView
-          webViewRef.current.postMessage(JSON.stringify(eventList));
-        } catch (err) {
-          console.error("Error parsing SignalR event message:", err);
-        }
-      });
-
-        signalrConnection.on("eventDeleted", (eventId) => {
-          try {
-            console.log("SignalR: Received eventDeleted", eventId);
-            // Instead of telling the WebView to remove one marker, we'll just
-            // ask the server for the new, authoritative list of events.
-            // This prevents state inconsistencies.
-            getAllOpenEvents();
-          } catch (err) {
-            console.error("Error handling eventDeleted message:", err);
-          }
-        });
-
-        signalrConnection.on("eventStatusChanged", (eventId) => {
-          try {
-            console.log("SignalR: Received eventStatusChanged", eventId);
-            // The user is a participant if they are the host OR if they have joined the event.
-            // We can check against the list of events the user has joined.
-            // Let's assume you have a state `usersEvents` that holds this info.
-            // Or we can just refresh all events to get the latest state.
-            // Refreshing is simpler and less prone to state inconsistencies.
-            getAllOpenEvents();
-            
-          } catch (err) {
-            console.error("Error handling eventStatusChanged message:", err);
-          }
-        });
-
-        // New event running SignalR handlers
-        signalrConnection.on("eventStarted", (eventData) => {
-          try {
-            console.log("SignalR: Received eventStarted", eventData);
-            handleEventStarted(eventData);
-          } catch (err) {
-            console.error("Error handling eventStarted message:", err);
-          }
-        });
-
-        signalrConnection.on("runnerPositionUpdate", (positionData) => {
-          try {
-            console.log("SignalR: Received runnerPositionUpdate", positionData);
-            console.log("Current user ID:", userId);
-            console.log("Position data user ID:", positionData.userId);
-            console.log("Current mode:", modeRef.current);
-            console.log("Current event run:", currentEventRunRef.current);
-            
-            // Check if user is currently participating in an event run
-            if (modeRef.current !== "eventRun" || !currentEventRunRef.current) {
-              console.log("Ignoring position update - user not in event run mode");
-              return;
-            }
-            
-            // Check if the position update is for the current event
-            if (positionData.eventId !== currentEventRunRef.current.eventId) {
-              console.log("Ignoring position update - not for current event");
-              return;
-            }
-            
-            // Ignore position updates for the current user (they have their own green marker)
-            if (positionData.userId === userId) {
-              console.log("Ignoring position update - it's for the current user");
-              return;
-            }
-            
-            // Update local runners state
-            setEventRunners(prevRunners => {
-              const updatedRunners = prevRunners.filter(runner => runner.userId !== positionData.userId);
-              return [...updatedRunners, positionData];
-            });
-            
-            // Send to WebView (only for other runners)
-            console.log("Sending position update to WebView for other runner:", positionData);
-            webViewRef.current.postMessage(JSON.stringify({
-              type: 'updateRunnerPosition',
-              data: positionData
-            }));
-          } catch (err) {
-            console.error("Error handling runnerPositionUpdate message:", err);
-          }
-        });
-
-        signalrConnection.on("runnerRemoved", (removalData) => {
-          try {
-            console.log("SignalR: Received runnerRemoved", removalData);
-            console.log("Current mode:", modeRef.current);
-            console.log("Current event run:", currentEventRunRef.current);
-            
-            // Check if user is currently participating in an event run
-            if (modeRef.current !== "eventRun" || !currentEventRunRef.current) {
-              console.log("Ignoring runner removal - user not in event run mode");
-              return;
-            }
-            
-            // Check if the removal is for the current event
-            if (removalData.eventId !== currentEventRunRef.current.eventId) {
-              console.log("Ignoring runner removal - not for current event");
-              return;
-            }
-            
-            // Ignore removal updates for the current user
-            if (removalData.userId === userId) {
-              console.log("Ignoring runner removal - it's for the current user");
-              return;
-            }
-            
-            // Remove the runner from local state
-            setEventRunners(prevRunners => 
-              prevRunners.filter(runner => runner.userId !== removalData.userId)
-            );
-            
-            // Send to WebView to remove the runner marker (only for other runners)
-            console.log("Removing runner marker from WebView for other runner:", removalData.userId);
-            webViewRef.current.postMessage(JSON.stringify({
-              type: 'removeRunner',
-              data: { userId: removalData.userId }
-            }));
-          } catch (err) {
-            console.error("Error handling runnerRemoved message:", err);
-          }
-        });
-
-        // Add reconnecting and reconnected handlers
-        signalrConnection.onreconnecting((error) => {
-          console.log("SignalR reconnecting:", error);
-          // Optionally show a reconnecting UI state
-        });
-
-        signalrConnection.onreconnected((connectionId) => {
-          console.log("SignalR reconnected:", connectionId);
-          // Refresh data after reconnection
-          getAllOpenEvents();
-          getAllTracks();
-          //getUsersEvents(user_id);
-        });
-
-        signalrConnection.onclose(() => {
-          console.log("SignalR connection closed.");
-        });
-
-        await signalrConnection.start();
-        console.log("SignalR connected.");
-        setConnection(signalrConnection);
-      } catch (error) {
-        console.error("SignalR setup failed:", error);
+        console.log("SignalR: Received eventStatusChanged", eventId);
+        getAllOpenEvents();
+      } catch (err) {
+        console.error("Error handling eventStatusChanged message:", err);
       }
-    };
+    });
 
-    connectToSignalR();
+    connection.on("eventStarted", (eventData) => {
+      try {
+        console.log("SignalR: Received eventStarted", eventData);
+        handleEventStarted(eventData);
+      } catch (err) {
+        console.error("Error handling eventStarted message:", err);
+      }
+    });
 
-  }, []);
+    connection.on("runnerPositionUpdate", (positionData) => {
+      try {
+        console.log("SignalR: Received runnerPositionUpdate", positionData);
+        console.log("Current user ID:", userId);
+        console.log("Position data user ID:", positionData.userId);
+        console.log("Current mode:", modeRef.current);
+        console.log("Current event run:", currentEventRunRef.current);
+        
+        // Check if user is currently participating in an event run
+        if (modeRef.current !== "eventRun" || !currentEventRunRef.current) {
+          console.log("Ignoring position update - user not in event run mode");
+          return;
+        }
+        
+        // Check if the position update is for the current event
+        if (positionData.eventId !== currentEventRunRef.current.eventId) {
+          console.log("Ignoring position update - not for current event");
+          return;
+        }
+        
+        // Ignore position updates for the current user (they have their own green marker)
+        if (positionData.userId === userId) {
+          console.log("Ignoring position update - it's for the current user");
+          return;
+        }
+        
+        // Update local runners state
+        setEventRunners(prevRunners => {
+          const updatedRunners = prevRunners.filter(runner => runner.userId !== positionData.userId);
+          return [...updatedRunners, positionData];
+        });
+        
+        // Send to WebView (only for other runners)
+        console.log("Sending position update to WebView for other runner:", positionData);
+        webViewRef.current.postMessage(JSON.stringify({
+          type: 'updateRunnerPosition',
+          data: positionData
+        }));
+      } catch (err) {
+        console.error("Error handling runnerPositionUpdate message:", err);
+      }
+    });
+
+    connection.on("runnerRemoved", (removalData) => {
+      try {
+        console.log("SignalR: Received runnerRemoved", removalData);
+        console.log("Current mode:", modeRef.current);
+        console.log("Current event run:", currentEventRunRef.current);
+        
+        // Check if user is currently participating in an event run
+        if (modeRef.current !== "eventRun" || !currentEventRunRef.current) {
+          console.log("Ignoring runner removal - user not in event run mode");
+          return;
+        }
+        
+        // Check if the removal is for the current event
+        if (removalData.eventId !== currentEventRunRef.current.eventId) {
+          console.log("Ignoring runner removal - not for current event");
+          return;
+        }
+        
+        // Ignore removal updates for the current user
+        if (removalData.userId === userId) {
+          console.log("Ignoring runner removal - it's for the current user");
+          return;
+        }
+        
+        // Remove the runner from local state
+        setEventRunners(prevRunners => 
+          prevRunners.filter(runner => runner.userId !== removalData.userId)
+        );
+        
+        // Send to WebView to remove the runner marker (only for other runners)
+        console.log("Removing runner marker from WebView for other runner:", removalData.userId);
+        webViewRef.current.postMessage(JSON.stringify({
+          type: 'removeRunner',
+          data: { userId: removalData.userId }
+        }));
+      } catch (err) {
+        console.error("Error handling runnerRemoved message:", err);
+      }
+    });
+
+    connection.onreconnected((connectionId) => {
+      console.log("SignalR reconnected:", connectionId);
+      // Refresh data after reconnection
+      getAllOpenEvents();
+      getAllTracks();
+    });
+
+    setListenersUp(true);
+  }, [connection]);
+
 
   useEffect(() => {
     const startWatchingLocation = async () => {
@@ -379,50 +295,6 @@ function MainScreen({ navigation, username, userId, userToken, route }) {
     }
   };
 
-  const deleteEvent = async (id) => {
-    try {
-
-      console.log("deleting event: ", id);
-      const data = await fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/deleteEvent', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          eventId: id
-        }),
-      });
-      console.log('Event deleted successfully:', data);
-      eventList.events = eventList.events.filter(event => event.id !== data.eventId);
-      webViewRef.current.postMessage(JSON.stringify(eventList));
- 
-    } catch (error) {
-      console.error('Error requesting event deletion:', error);
-      Alert.alert('Error', 'Failed to send delete request. The event may not have been deleted.');
-    }
-  };
-
-  const joinEvent = async (event_id) => {
-    try {
-      console.log('Joining event with userId:', userId, 'eventId:', event_id);
-      const responseData = await fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/joinEvent', {
-        method: 'POST',
-        body: JSON.stringify({
-          eventId: event_id,
-          userId: userId, // Use userId for API calls
-        }),
-      });
-
-      console.log('Join event success response:', responseData);
-
-      // Refresh user's events
-      getUsersEvents();
-    } catch (error) {
-      console.error('Error joining event:', error);
-      Alert.alert('Error', 'Failed to join event');
-    }
-  };
-
   const getAllOpenEvents = async () => {
     try {
       const data = await fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/getAllOpenEvents');
@@ -488,30 +360,15 @@ const getAllTracks = async () => {
     }
   };
 
-  const getEventUsersForDisplay = async (id, eventObject) => {
-    try {
-      const [usersResponse, readyUsersResponse] = await Promise.all([
-        fetchWithAuth(
-          `https://runfuncionapp.azurewebsites.net/api/getEventRegisteredUsers?eventId=${encodeURIComponent(id)}`
-        ),
-        fetchWithAuth(
-          `https://runfuncionapp.azurewebsites.net/api/getEventReadyUsers?eventId=${encodeURIComponent(id)}`
-        )
-      ]);
-      
-      eventObject["usersList"] = usersResponse;
-      eventObject["readyUsers"] = readyUsersResponse.map(user => user.UserId);
-      setSelectedEvent(eventObject);
-      console.log('Got users:', usersResponse);
-      console.log('Got ready users:', readyUsersResponse);
-    } catch (error) {
-      console.error('Error fetching event users:', error);
-      // Handle error appropriately
-    }
-  };
-
   const createTrack = async (track) => {
     console.log("Creating track:", track);
+    
+    // Validate track data before making API call
+    if (!track || !Array.isArray(track) || track.length === 0) {
+      console.error('Cannot create track: Invalid or empty track data');
+      return null;
+    }
+    
     try {
       const data = await fetchWithAuth(
         'https://runfuncionapp.azurewebsites.net/api/createTrack',
@@ -535,6 +392,13 @@ const getAllTracks = async () => {
 
   const createActivity = async (activity) => {
     console.log("Logging run to database:", activity);
+    
+    // Validate that the activity has a valid path
+    if (!activity.path || !Array.isArray(activity.path) || activity.path.length === 0) {
+      console.error('Cannot create activity: Invalid or empty path');
+      return;
+    }
+    
     activity.userId = userId;
     let track_id = await createTrack(activity.path);
     if (!track_id) {
@@ -573,74 +437,9 @@ const getAllTracks = async () => {
     setIsSheetVisible(false); // hide sheet
   };
 
-  const openEventDisplay = () => {
-    eventDisplayRef.current?.snapToIndex(1);
-    setIsEventDisplayVisible(true);
-  }
-
   function navigateToSelectTrack() {
     navigation.navigate('SelectTrack');
   }
-
-  const handleStartEvent = async (eventId) => {
-    try {
-      const response = await setEventReady(eventId);
-
-      // Update the event in the local state
-      const updatedEvent = { ...selectedEvent, status: 'ready' };
-      setSelectedEvent(updatedEvent);
-
-      // Update the event in the events list
-      eventList.events = eventList.events.map(event => 
-        event.id === eventId ? { ...event, status: 'ready' } : event
-      );
-      webViewRef.current.postMessage(JSON.stringify(eventList));
-
-    } catch (error) {
-      console.error('Error starting event:', error);
-      Alert.alert('Error', 'Failed to start event');
-    }
-  };
-
-  const handleMarkReady = async (eventId) => {
-    try {
-      const response = await markUserReady(eventId, userId);
-
-      // Update the ready users list in the selected event
-      const updatedEvent = {
-        ...selectedEvent,
-        readyUsers: [...(selectedEvent.readyUsers || []), userId]
-      };
-      setSelectedEvent(updatedEvent);
-
-    } catch (error) {
-      console.error('Error marking as ready:', error);
-      Alert.alert('Error', 'Failed to mark as ready');
-    }
-  };
-
-  const handleStartEventNow = async (eventId) => {
-    try {
-      const response = await startEvent(eventId, userId);
-
-      // Update the event in the local state
-      const updatedEvent = { ...selectedEvent, status: 'started' };
-      setSelectedEvent(updatedEvent);
-
-      // Update the event in the events list
-      eventList.events = eventList.events.map(event => 
-        event.id === eventId ? { ...event, status: 'started' } : event
-      );
-      webViewRef.current.postMessage(JSON.stringify(eventList));
-
-      // Close the event display
-      setIsEventDisplayVisible(false);
-
-    } catch (error) {
-      console.error('Error starting event:', error);
-      Alert.alert('Error', 'Failed to start event');
-    }
-  };
 
   // New event running handlers
   const handleEventStarted = async (eventData) => {
@@ -649,7 +448,6 @@ const getAllTracks = async () => {
       console.log('Current userId:', userId);
       console.log('Ready users:', eventData.readyUsers);
       console.log('Removed users:', eventData.removedUsers);
-      console.log('Selected event host:', selectedEvent?.host);
       
       // Check if current user was removed for not being ready
       if (eventData.removedUsers && eventData.removedUsers.includes(userId)) {
@@ -660,11 +458,6 @@ const getAllTracks = async () => {
           [{ text: 'OK' }]
         );
         
-        // Close event display if it's open
-        if (isEventDisplayVisible) {
-          setIsEventDisplayVisible(false);
-        }
-        
         // Refresh events to update the UI
         getAllOpenEvents();
         getUsersEvents();
@@ -673,11 +466,12 @@ const getAllTracks = async () => {
       
       // Check if current user is a participant in this event
       // This includes both ready users and the host
-      const isParticipant = eventData.readyUsers.includes(userId) || selectedEvent?.host === userId;
+      const isParticipant = eventData.readyUsers.includes(userId);
       console.log('Is participant:', isParticipant);
       
       if (isParticipant) {
         console.log('Starting event run for participant');
+        navigation.popToTop();
         // Set current event run state
         setCurrentEventRun({
           eventId: eventData.eventId,
@@ -687,6 +481,7 @@ const getAllTracks = async () => {
         
         // Enter event run
         setMode("eventRun");
+        navigation.navigate("mainMap");
         
         // Notify WebView to start event run
         webViewRef.current.postMessage(JSON.stringify({
@@ -784,22 +579,6 @@ const getAllTracks = async () => {
     }
   };
 
-  const handleLeaveEvent = async (eventId) => {
-    try {
-      console.log('Leaving event:', eventId, 'with userId:', userId);
-      await leaveEvent(eventId, userId, userId);
-
-      // Refresh user's events
-      getUsersEvents();
-      
-      // Close the event display
-      setIsEventDisplayVisible(false);
-    } catch (error) {
-      console.error('Error leaving event:', error);
-      Alert.alert('Error', 'Failed to leave event');
-    }
-  };
-
   // Listen for messages from the map:
   const handleWebViewMessage = (event) => {
     try {
@@ -849,8 +628,7 @@ const getAllTracks = async () => {
           getAllTracks();
           getUsersEvents();
         } else if (data.data.action === "openEventDisplay") {
-          getEventUsersForDisplay(data.data.eventObject.id, data.data.eventObject);
-          openEventDisplay();
+          navigation.navigate('EventScreen', { 'eventId': data.data.eventObject.id });
         } else if (data.data.action === "enterFreeRunMode") {
           setMode("freeRun")
         } else if (data.data.action === "enterEventRunMode") {
@@ -927,19 +705,6 @@ const getAllTracks = async () => {
           onClose={() => setIsSheetVisible(false)}
           visible={isSheetVisible}
         />
-        {isEventDisplayVisible && (
-          <CreateEventDisplay
-            ref={eventDisplayRef}
-            eventObject={selectedEvent}
-            joinEvent={joinEvent}
-            deleteEvent={deleteEvent}
-            leaveEvent={handleLeaveEvent}
-            userId={userId}
-            onStartEvent={handleStartEvent}
-            onMarkReady={handleMarkReady}
-            onStartEventNow={handleStartEventNow}
-          />
-        )}
       </View>
     </GestureHandlerRootView>
   )
@@ -1010,6 +775,7 @@ export default function App() {
   const [userToken, setUserToken] = useState(null);
   const [userId, setUserId] = useState(null);
   const [username, setUsername] = useState(null);
+  const [connection, setConnection] = useState(null);
 
   const handleLogout = async () => {
     try {
@@ -1072,6 +838,48 @@ export default function App() {
     checkToken();
   }, []);
 
+  useEffect(() => {
+    const connectToSignalR = async () => {
+      try {
+        // STEP 1: Call backend negotiate endpoint to get URL + token
+        const res = await fetch("https://runfuncionapp.azurewebsites.net/api/negotiate");
+        if (!res.ok) throw new Error("Failed to fetch SignalR info");
+
+        const { url, accessToken } = await res.json();
+
+        // STEP 2: Use the returned info to connect
+        const signalrConnection = new SignalR.HubConnectionBuilder()
+          .withUrl(url, {
+            accessTokenFactory: () => accessToken,
+            timeout: 30000, // 30 second timeout
+          })
+          .withAutomaticReconnect([0, 2000, 5000, 10000, 30000]) // Retry after 0s, 2s, 5s, 10s, then every 30s
+          .configureLogging(SignalR.LogLevel.Information)
+          .build();
+        
+        // Add reconnecting and reconnected handlers
+        signalrConnection.onreconnecting((error) => {
+          console.log("SignalR reconnecting:", error);
+        });
+
+        signalrConnection.onreconnected((connectionId) => {
+          console.log("SignalR reconnected:", connectionId);
+        });
+
+        signalrConnection.onclose(() => {
+          console.log("SignalR connection closed.");
+        });
+
+        await signalrConnection.start();
+        console.log("SignalR connected.");
+        setConnection(signalrConnection);
+      } catch (error) {
+        console.error("SignalR setup failed:", error);
+      }
+    }
+    connectToSignalR();
+  }, []);
+
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -1116,6 +924,7 @@ export default function App() {
                   username={username}
                   userId={userId}
                   userToken={userToken}
+                  connection={connection}
                 />
               )}
             </Stack.Screen>
@@ -1199,6 +1008,27 @@ export default function App() {
               {props => (
                 <UserSearchScreen
                   {...props}
+                />
+              )}
+            </Stack.Screen>
+            <Stack.Screen
+              name="EventScreen"
+              options={{
+                title: 'Event Details',
+                headerStyle: {
+                  backgroundColor: '#007AFF',
+                },
+                headerTintColor: '#fff',
+                headerTitleStyle: {
+                  fontWeight: 'bold',
+                },
+              }}
+            >
+              {props => (
+                <EventScreen
+                  {...props}
+                  userId={userId}
+                  connection={connection}
                 />
               )}
             </Stack.Screen>

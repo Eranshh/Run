@@ -28,6 +28,7 @@
     let summaryStartMarker = null;
     let mapIsReady = false;
     let pendingTrack = null;
+    let pendingPoint = null;
     window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Inside runSummaryMap.html'}}));
 
     function initMap() {
@@ -48,6 +49,9 @@
         if (pendingTrack) {
           drawPath(pendingTrack);
           pendingTrack = null;
+        } else if (pendingPoint) {
+          drawPoint(pendingPoint);
+          pendingPoint = null;
         }
       });
     }
@@ -140,6 +144,49 @@
         window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Camera set to single point'}}));
       }
     }
+
+    function drawPoint(point) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'drawPoint called. Point longitude: ' + point.longitude + 'latitude: ' + point.latitude}}));
+      if (!map) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Map not ready'}}));
+        return;
+      }
+
+      // Remove former track / point if exist:
+      if (summaryLineSource) {
+        map.sources.remove(summaryLineSource);
+        summaryLineSource = null;
+      }
+
+      if (summaryStartMarker) {
+        map.markers.remove(summaryStartMarker);
+        summaryStartMarker = null;
+      }
+
+      if (window.summaryFinishMarker) {
+        map.markers.remove(window.summaryFinishMarker);
+        window.summaryFinishMarker = null;
+      }
+
+      // Add start marker
+      window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Adding start marker at: ' + JSON.stringify([point.longitude, point.latitude])}}));
+      const startMarker = new atlas.HtmlMarker({
+        position: [point.longitude, point.latitude],
+        text: '🔰',
+        color: '#2ecc71'
+      });
+      map.markers.add(startMarker);
+      summaryStartMarker = startMarker;
+      window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Start marker added'}}));
+
+      // Set camera position
+      map.setCamera({
+        center: [point.longitude, point.latitude],
+        zoom: 20
+      });
+      window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Camera set to single point'}}));
+    }
+
     window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Checking for messages'}}));
 
     // Listen for messages from React Native
@@ -155,6 +202,13 @@
             drawPath({ path: data.path });
           } else {
             pendingTrack = { path: data.path };
+          }
+        } else if (data.longitude && data.latitude) {
+          console.log('Point received, drawing point...');
+          if (mapIsReady) {
+            drawPoint(data)
+          } else {
+            pendingPoint = data;
           }
         }
       } catch (e) {
