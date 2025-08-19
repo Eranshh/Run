@@ -142,11 +142,7 @@ export default function RunHistory({ navigation, userId, profileId }) {
               `https://runfuncionapp.azurewebsites.net/api/getUsersActivities?userId=${encodeURIComponent(profileId)}`
             );
             
-            // Debug: Log the date fields to see what we're getting
-            console.log("Raw runs data:", data);
-            data.forEach((run, index) => {
-              console.log(`Run ${index} date field:`, run.date, 'Type:', typeof run.date);
-            });
+
             
             setRuns(data);
           } catch (error) {
