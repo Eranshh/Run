@@ -966,8 +966,8 @@
 
             if (runType === 'event') {
                 window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'endEventRun'}}));
+                clearEventRunState();
             }
-            clearEventRunState();
         }
 
         function clearEventRunState() {
