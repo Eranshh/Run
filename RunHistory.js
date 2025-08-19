@@ -13,47 +13,72 @@ import { fetchWithAuth } from './utils/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CommonActions } from '@react-navigation/native';
 
-const RunItem = ({ run, onPress }) => (
-  <TouchableOpacity style={styles.runItem} onPress={() => onPress(run)}>
-    <View style={styles.runHeader}>
-      <Text style={styles.runDate}>{new Date(run.date).toLocaleDateString()}</Text>
-      <Text style={styles.runType}>{run.type}</Text>
-    </View>
-    <View style={styles.runDetails}>
-      <View style={styles.detailItem}>
-        <Text style={styles.detailLabel}>Distance</Text>
-        <Text style={styles.detailValue}>{(run.distance / 1000).toFixed(2)} km</Text>
+const RunItem = ({ run, onPress }) => {
+  // Helper function to safely format date
+  const formatDate = (dateString) => {
+    if (!dateString) return 'No Date';
+    
+    let date;
+    
+    // Check if it's a Unix timestamp (numeric string)
+    if (typeof dateString === 'string' && /^\d+$/.test(dateString)) {
+      // Convert Unix timestamp (milliseconds) to Date object
+      date = new Date(parseInt(dateString));
+    } else {
+      // Try parsing as regular date string
+      date = new Date(dateString);
+    }
+    
+    if (isNaN(date.getTime())) {
+      return 'Invalid Date';
+    }
+    
+    return date.toLocaleDateString();
+  };
+
+  return (
+    <TouchableOpacity style={styles.runItem} onPress={() => onPress(run)}>
+      <View style={styles.runHeader}>
+        <Text style={styles.runDate}>{formatDate(run.date)}</Text>
+        <Text style={styles.runType}>{run.type}</Text>
       </View>
-      <View style={styles.detailItem}>
-        <Text style={styles.detailLabel}>Duration</Text>
-        <Text style={styles.detailValue}>{Math.floor(run.duration / 60)} min</Text>
+          <View style={styles.runDetails}>
+        <View style={styles.detailItem}>
+          <Text style={styles.detailLabel}>Distance</Text>
+          <Text style={styles.detailValue}>{(run.distance / 1000).toFixed(2)} km</Text>
+        </View>
+        <View style={styles.detailItem}>
+          <Text style={styles.detailLabel}>Duration</Text>
+          <Text style={styles.detailValue}>{Math.floor(run.duration / 60)} min</Text>
+        </View>
+        <View style={styles.detailItem}>
+          <Text style={styles.detailLabel}>Pace</Text>
+          <Text style={styles.detailValue}>{run.averagePace?.toFixed(2) || 'N/A'} min/km</Text>
+        </View>
       </View>
-      <View style={styles.detailItem}>
-        <Text style={styles.detailLabel}>Pace</Text>
-        <Text style={styles.detailValue}>{run.averagePace?.toFixed(2) || 'N/A'} min/km</Text>
+      <View style={styles.runDetails}>
+        <View style={styles.detailItem}>
+          <Text style={styles.detailLabel}>Speed</Text>
+          <Text style={styles.detailValue}>{run.averageSpeed?.toFixed(1) || 'N/A'} km/h</Text>
+        </View>
+        <View style={styles.detailItem}>
+          <Text style={styles.detailLabel}>Calories</Text>
+          <Text style={styles.detailValue}>{run.calories?.toFixed(0) || 'N/A'}</Text>
+        </View>
+        <View style={styles.detailItem}>
+          <Text style={styles.detailLabel}>Route</Text>
+          <Text style={styles.detailValue}>{run.route}</Text>
+        </View>
       </View>
-    </View>
-    <View style={styles.runDetails}>
-      <View style={styles.detailItem}>
-        <Text style={styles.detailLabel}>Speed</Text>
-        <Text style={styles.detailValue}>{run.averageSpeed?.toFixed(1) || 'N/A'} km/h</Text>
-      </View>
-      <View style={styles.detailItem}>
-        <Text style={styles.detailLabel}>Calories</Text>
-        <Text style={styles.detailValue}>{run.calories?.toFixed(0) || 'N/A'}</Text>
-      </View>
-      <View style={styles.detailItem}>
-        <Text style={styles.detailLabel}>Route</Text>
-        <Text style={styles.detailValue}>{run.route}</Text>
-      </View>
-    </View>
-  </TouchableOpacity>
-);
+    </TouchableOpacity>
+  );
+};
 
 export default function RunHistory({ navigation, userId, profileId }) {
     const [runs, setRuns] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [userTracks, setUserTracks] = useState([]);
+    const [sortOrder, setSortOrder] = useState('newest'); // 'newest' or 'oldest'
 
     const handleRunPress = (run) => {
         console.log('handleRunPress called with run:', run);
@@ -64,7 +89,50 @@ export default function RunHistory({ navigation, userId, profileId }) {
         console.log('Found track:', track);
         
         navigation.navigate('RunSummary', { run, track });
-    };    
+    };
+
+    const handleSortToggle = () => {
+        setSortOrder(sortOrder === 'newest' ? 'oldest' : 'newest');
+    };
+
+    const getSortedRuns = () => {
+        if (!runs || runs.length === 0) return [];
+        
+        return [...runs].sort((a, b) => {
+            let dateA, dateB;
+            
+            // Handle Unix timestamps for date A
+            if (typeof a.date === 'string' && /^\d+$/.test(a.date)) {
+                dateA = new Date(parseInt(a.date));
+            } else {
+                dateA = new Date(a.date);
+            }
+            
+            // Handle Unix timestamps for date B
+            if (typeof b.date === 'string' && /^\d+$/.test(b.date)) {
+                dateB = new Date(parseInt(b.date));
+            } else {
+                dateB = new Date(b.date);
+            }
+            
+            // Handle invalid dates by treating them as very old dates
+            const isValidDateA = !isNaN(dateA.getTime());
+            const isValidDateB = !isNaN(dateB.getTime());
+            
+            // If both dates are invalid, maintain original order
+            if (!isValidDateA && !isValidDateB) return 0;
+            
+            // If only one date is invalid, put invalid dates at the end
+            if (!isValidDateA) return 1;
+            if (!isValidDateB) return -1;
+            
+            if (sortOrder === 'newest') {
+                return dateB - dateA; // Newest first
+            } else {
+                return dateA - dateB; // Oldest first
+            }
+        });
+    };
 
     useEffect(() => {
         const getUserRuns = async () => {
@@ -73,6 +141,13 @@ export default function RunHistory({ navigation, userId, profileId }) {
             const data = await fetchWithAuth(
               `https://runfuncionapp.azurewebsites.net/api/getUsersActivities?userId=${encodeURIComponent(profileId)}`
             );
+            
+            // Debug: Log the date fields to see what we're getting
+            console.log("Raw runs data:", data);
+            data.forEach((run, index) => {
+              console.log(`Run ${index} date field:`, run.date, 'Type:', typeof run.date);
+            });
+            
             setRuns(data);
           } catch (error) {
             console.error('Error fetching runs:', error);
@@ -125,23 +200,62 @@ export default function RunHistory({ navigation, userId, profileId }) {
     }
 
     return (
-        <FlatList
-            data={runs}
-            renderItem={({ item }) => <RunItem run={item} onPress={handleRunPress} />}
-            keyExtractor={item => item.id}
-            contentContainerStyle={styles.listContainer}
-            showsVerticalScrollIndicator={false}
-            ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>No runs recorded yet</Text>
-                {userId === profileId && <Text style={styles.emptySubtext}>Start running to see your history here!</Text>}
+        <View style={styles.container}>
+            <View style={styles.header}>
+                <Text style={styles.headerTitle}>Run History</Text>
+                <TouchableOpacity style={styles.sortButton} onPress={handleSortToggle}>
+                    <Text style={styles.sortButtonText}>
+                        {sortOrder === 'newest' ? 'Newest First' : 'Oldest First'}
+                    </Text>
+                </TouchableOpacity>
             </View>
-            }
-        />
+            <FlatList
+                data={getSortedRuns()}
+                renderItem={({ item }) => <RunItem run={item} onPress={handleRunPress} />}
+                keyExtractor={item => item.id}
+                contentContainerStyle={styles.listContainer}
+                showsVerticalScrollIndicator={false}
+                ListEmptyComponent={
+                <View style={styles.emptyContainer}>
+                    <Text style={styles.emptyText}>No runs recorded yet</Text>
+                    {userId === profileId && <Text style={styles.emptySubtext}>Start running to see your history here!</Text>}
+                </View>
+                }
+            />
+        </View>
     )
 }
 
 const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#f5f5f5',
+    },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 16,
+        backgroundColor: 'white',
+        borderBottomWidth: 1,
+        borderBottomColor: '#e0e0e0',
+    },
+    headerTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#333',
+    },
+    sortButton: {
+        backgroundColor: '#007AFF',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 16,
+    },
+    sortButtonText: {
+        color: 'white',
+        fontSize: 14,
+        fontWeight: '500',
+    },
     loadingContainer: {
       flex: 1,
       justifyContent: 'center',
