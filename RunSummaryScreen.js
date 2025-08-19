@@ -15,32 +15,21 @@ export default function RunSummaryScreen({ route }) {
   const [loadingParticipants, setLoadingParticipants] = useState(false);
   const [participantsError, setParticipantsError] = useState(null);
 
-  // Add logging to see what data we're getting
-  console.log('RunSummaryScreen - Run data:', run);
-  console.log('RunSummaryScreen - Track data:', track);
-  console.log('RunSummaryScreen - Track path:', track?.path);
+
 
   const sendPathToWebView = () => {
-    console.log('sendPathToWebView called');
     if (track && track.path && webViewRef.current) {
-      console.log('Sending path to WebView:', track.path);
       webViewRef.current.postMessage(JSON.stringify({ path: track.path }));
-    } else {
-      console.log('Cannot send path - track:', !!track, 'path:', !!track?.path, 'webViewRef:', !!webViewRef.current);
     }
   };
 
-  // Handle messages from the WebView (for debugging)
+  // Handle messages from the WebView
   const handleWebViewMessage = (event) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
-      if (data && data.data && data.data.action === 'log') {
-        console.log('[WebView LOG]:', data.data.message);
-      } else {
-        console.log('[WebView MSG]:', data);
-      }
+      // Handle any WebView messages if needed
     } catch (err) {
-      console.error('Error parsing WebView message:', err, event.nativeEvent.data);
+      console.error('Error parsing WebView message:', err);
     }
   };
 
@@ -101,6 +90,42 @@ export default function RunSummaryScreen({ route }) {
     }
   }, [track]);
 
+  // Calculate elevation statistics from track path
+  const calculateElevationStats = (path) => {
+    if (!path || path.length < 2) {
+      return null;
+    }
+    
+    const elevations = path
+      .map(point => Array.isArray(point) ? point[2] : point.altitude)
+      .filter(alt => alt !== null && alt !== undefined && alt !== 0 && !isNaN(alt));
+    
+    if (elevations.length === 0) {
+      return null;
+    }
+    
+    const minElevation = Math.min(...elevations);
+    const maxElevation = Math.max(...elevations);
+    const totalElevationGain = path.reduce((total, point, index) => {
+      if (index === 0) return 0;
+      const prevAlt = Array.isArray(path[index - 1]) ? path[index - 1][2] : path[index - 1].altitude;
+      const currAlt = Array.isArray(point) ? point[2] : point.altitude;
+      if (prevAlt !== null && currAlt !== null && prevAlt !== 0 && currAlt !== 0 && !isNaN(prevAlt) && !isNaN(currAlt) && currAlt > prevAlt) {
+        return total + (currAlt - prevAlt);
+      }
+      return total;
+    }, 0);
+    
+    return {
+      min: minElevation,
+      max: maxElevation,
+      gain: totalElevationGain,
+      avg: elevations.reduce((sum, alt) => sum + alt, 0) / elevations.length
+    };
+  };
+
+  const elevationStats = calculateElevationStats(track?.path);
+
   // Pick the first available date field
   const runDate = run.timestamp || run.date || run.start_time || run.stop_time;
 
@@ -114,6 +139,14 @@ export default function RunSummaryScreen({ route }) {
         <View style={styles.statRow}><Text style={styles.statLabel}>🏃 Pace:</Text><Text style={styles.statValue}>{run.averagePace?.toFixed(2) || 'N/A'} min/km</Text></View>
         <View style={styles.statRow}><Text style={styles.statLabel}>🚀 Speed:</Text><Text style={styles.statValue}>{run.averageSpeed?.toFixed(1) || 'N/A'} km/h</Text></View>
         <View style={styles.statRow}><Text style={styles.statLabel}>🔥 Calories:</Text><Text style={styles.statValue}>{run.calories?.toFixed(0) || 'N/A'}</Text></View>
+        {elevationStats && (
+          <>
+            <View style={styles.statRow}><Text style={styles.statLabel}>⛰️ Elevation Gain:</Text><Text style={styles.statValue}>{elevationStats.gain.toFixed(0)} m</Text></View>
+            <View style={styles.statRow}><Text style={styles.statLabel}>📈 Max Elevation:</Text><Text style={styles.statValue}>{elevationStats.max.toFixed(0)} m</Text></View>
+            <View style={styles.statRow}><Text style={styles.statLabel}>📉 Min Elevation:</Text><Text style={styles.statValue}>{elevationStats.min.toFixed(0)} m</Text></View>
+            <View style={styles.statRow}><Text style={styles.statLabel}>📊 Avg Elevation:</Text><Text style={styles.statValue}>{elevationStats.avg.toFixed(0)} m</Text></View>
+          </>
+        )}
         <View style={styles.statRow}><Text style={styles.statLabel}>🏷️ Type:</Text><Text style={styles.statValue}>{run.type}</Text></View>
         <View style={styles.statRow}><Text style={styles.statLabel}>🗺️ Route:</Text><Text style={styles.statValue}>{run.route}</Text></View>
       </View>
