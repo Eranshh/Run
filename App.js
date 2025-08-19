@@ -571,6 +571,7 @@ const getAllTracks = async () => {
       setCurrentEventRun(null);
       setEventRunners([]);
       setMode("mainMap");
+      webViewRef.current.postMessage(JSON.stringify({type: 'eventRunEnded'}));
       getAllOpenEvents();
       
     } catch (error) {

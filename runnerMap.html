@@ -469,6 +469,8 @@
                             removeRunner(data.data.userId);
                         }else if (type === 'log') {
                             console.log('Log from WebView:', data.message);
+                        }else if (type === 'eventRunEnded') {
+                            clearEventRunState();
                         }else {
                             console.warn('Unknown message type:', type);
                         }
@@ -968,32 +970,28 @@
 
             if (runType === 'event') {
                 window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'endEventRun'}}));
-
-                // Clear event run state
-                currentEventRun = null;
-                eventRunners.clear();
-                eventRunnerMarkers.forEach(marker => {
-                    map.markers.remove(marker);
-                });
-                eventRunnerMarkers.clear();
-
-                // Remove event track from map
-                if (eventTrackLayer) {
-                    map.layers.remove(eventTrackLayer);
-                    eventTrackLayer = null;
-                }
-                if (eventTrackSource) {
-                    map.sources.remove(eventTrackSource);
-                    eventTrackSource = null;
-                }
+                clearEventRunState();
             }
-            // window.ReactNativeWebView.postMessage(JSON.stringify({
-            //     data: {
-            //         action: 'navigateToRunSummary',
-            //         run: activity,
-            //         track: { path: freeRunPath }
-            //     }
-            // }));
+        }
+
+        function clearEventRunState() {
+            // Clear event run state
+            currentEventRun = null;
+            eventRunners.clear();
+            eventRunnerMarkers.forEach(marker => {
+                map.markers.remove(marker);
+            });
+            eventRunnerMarkers.clear();
+
+            // Remove event track from map
+            if (eventTrackLayer) {
+                map.layers.remove(eventTrackLayer);
+                eventTrackLayer = null;
+            }
+            if (eventTrackSource) {
+                map.sources.remove(eventTrackSource);
+                eventTrackSource = null;
+            }
             runType = null;
         }
 
