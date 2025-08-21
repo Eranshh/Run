@@ -18,6 +18,7 @@ export default function EventScreen({ navigation, userId, connection }) {
     const [track, setTrack] = useState(null);
     const [longitude, setLongitude] = useState(null);
     const [latitude, setLatitude] = useState(null);
+    const [weather, setWeather] = useState(null);
 
     const route = useRoute();
     const eventId = route.params.eventId;
@@ -26,6 +27,11 @@ export default function EventScreen({ navigation, userId, connection }) {
     useEffect(() => {
         updateEventDetails(eventId);
     }, [])
+
+    useEffect(() => {
+        if (!startTime || !longitude || !latitude) return;
+        getWeatherForecast();
+    }, [startTime, longitude, latitude])
 
     useEffect(() => {
         if (listenersUp || !connection) return;
@@ -52,6 +58,69 @@ export default function EventScreen({ navigation, userId, connection }) {
         data.start_time ? setStartTime(data.start_time) : setStartTime(null);
         data.longitude ? setLongitude(data.longitude) : setLongitude(null);
         data.latitude ? setLatitude(data.latitude) : setLatitude(null);
+    }
+
+    const getWeatherForecast = async () => {
+        const subscriptionKey = "BSDCG4i6BIsimtM5jNRtCupaIm4boJb8WM92OhKd3jL6x14l3W6mJQQJ99BEACi5YpzPSPD9AAAgAZMP337x";
+        const weather_api = "https://atlas.microsoft.com/weather";
+
+        const now = Date.now();
+        const eventTime = Number(startTime);
+        const diffMS = eventTime - now; // Time in milliseconds until the event starts (negative = passed)
+        const diffHours = diffMS / (1000 * 60 * 60); // Time in hours
+        const diffDays = diffMS / (1000 * 60 * 60 * 24); // Time in days
+
+        if (diffHours <= 1) { // If at most an hour or passed, get current weather
+            try {
+                const response = await fetch(`${weather_api}/currentConditions/json?api-version=1.0&query=${latitude},${longitude}&subscription-key=${subscriptionKey}`);
+                const data = await response.json();
+                console.log("Got weather report:", data);
+
+                const weatherObj = {
+                    type: "current",
+                    phrase: data.results[0].phrase,
+                    temperature: data.results[0].temperature,
+                }
+                setWeather(weatherObj);
+            }
+            catch (err) {
+                console.log("Error fetching current weather:", error);
+            }
+        } else if (diffDays <= 3) { // If at most 3 days, get hourly weather
+            try {
+                const hourIndex = Math.floor(diffHours) - 1;
+                const response = await fetch(`${weather_api}/forecast/hourly/json?api-version=1.1&query=${latitude},${longitude}&subscription-key=${subscriptionKey}&duration=72`);
+                const data = await response.json();
+                console.log("Got weather report:", data.forecasts[hourIndex]);
+
+                const weatherObj = {
+                    type: "hourly",
+                    phrase: data.forecasts[hourIndex].iconPhrase,
+                    temperature: data.forecasts[hourIndex].temperature,
+                }
+                setWeather(weatherObj);
+            }
+            catch (err) {
+                console.log("Error fetching hoursly weather:", error);
+            }
+        } else if (diffDays <= 15) { // If at most 15 days, get daily weather
+            try {
+                const dayIndex = Math.floor(diffDays);
+                const response = await fetch(`${weather_api}/forecast/daily/json?api-version=1.1&query=${latitude},${longitude}&subscription-key=${subscriptionKey}&duration=15`);
+                data = await response.json();
+                console.log("Got weather report:", data.forecasts[dayIndex]);
+
+                const weatherObj = {
+                    type: "daily",
+                    phrase: data.forecasts[dayIndex].day.longPhrase,
+                    temperature: data.forecasts[dayIndex].temperature,
+                }
+                setWeather(weatherObj);
+            }
+            catch (err) {
+                console.log("Error fetching daily weather:", error);
+            }
+        }
     }
 
     const updateEventDetails = async (id) => {
@@ -242,6 +311,14 @@ export default function EventScreen({ navigation, userId, connection }) {
                     onMessage={handleWebViewMessage}
                 />
             )}
+            {!isLoading && weather && <View style={styles.weatherCard}>
+                <View style={styles.weatherHeader}>
+                    <Text style={styles.weatherTitle}>Weather</Text>
+                    {weather.type !== "daily" && <Text style={styles.weatherTemp}>{weather.temperature.value}°{weather.temperature.unit || 'C'}</Text>}
+                    {weather.type === "daily" && <Text style={styles.weatherTemp}>{weather.temperature.minimum.value} - {weather.temperature.maximum.value}°{weather.temperature.maximum.unit || 'C'}</Text>}
+                </View>
+                <Text style={styles.weatherConditions}>{weather.phrase}</Text>
+            </View>}
         </View>
     )
 }
@@ -303,5 +380,40 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingVertical: 4,
+    },
+    weatherCard: {
+        backgroundColor: '#f8f9fa',
+        borderRadius: 12,
+        padding: 12,
+        marginTop: 12,
+        marginBottom: 12,
+        shadowColor: '#000',
+        shadowOpacity: 0.08,
+        shadowOffset: { width: 0, height: 2 },
+        shadowRadius: 6,
+        elevation: 2,
+        borderLeftWidth: 3,
+        borderLeftColor: '#2196f3',
+    },
+    weatherHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 6,
+    },
+    weatherTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#1976d2',
+    },
+    weatherTemp: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#1976d2',
+    },
+    weatherConditions: {
+        fontSize: 14,
+        color: '#424242',
+        fontStyle: 'italic',
     },
 });
