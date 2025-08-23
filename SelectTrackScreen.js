@@ -120,7 +120,7 @@ export default function SelectTrackScreen({ navigation, route }) {
           </Text>
           <View style={styles.trackFooter}>
             <Text style={styles.distance}>Flexible distance</Text>
-            <TouchableOpacity style={styles.selectButton}>
+            <TouchableOpacity style={styles.selectButton} onPress={() => handleTrackSelect('free')}>
               <Text style={styles.selectButtonText}>Start Free Run</Text>
             </TouchableOpacity>
           </View>
@@ -146,7 +146,7 @@ export default function SelectTrackScreen({ navigation, route }) {
           <Text style={styles.distance}>
             {(item.distance / 1000).toFixed(1)} km
           </Text>
-          <TouchableOpacity style={styles.selectButton}>
+          <TouchableOpacity style={styles.selectButton} onPress={() => handleTrackSelect(item)}>
             <Text style={styles.selectButtonText}>Preview Track</Text>
           </TouchableOpacity>
         </View>

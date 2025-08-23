@@ -62,9 +62,7 @@ function MainScreen({ navigation, username, userId, userToken, route, connection
       } else if (routeMode === 'guidedRun' && routeSelectedTrack) {
         // Handle guided run with selected track
         console.log('Starting guided run with track:', routeSelectedTrack);
-        setSelectedTrack(routeSelectedTrack);
-        // You can add logic here to display the selected track on the map
-        // For now, just set the selected track
+        webViewRef.current?.postMessage(JSON.stringify({ type: 'startGuidedRun', trackId: routeSelectedTrack.trackId }))
       }
       
       // Mark as handled to prevent re-triggering
@@ -852,11 +850,13 @@ export default function App() {
         const signalrConnection = new SignalR.HubConnectionBuilder()
           .withUrl(url, {
             accessTokenFactory: () => accessToken,
-            timeout: 30000, // 30 second timeout
           })
           .withAutomaticReconnect([0, 2000, 5000, 10000, 30000]) // Retry after 0s, 2s, 5s, 10s, then every 30s
           .configureLogging(SignalR.LogLevel.Information)
           .build();
+        
+        signalrConnection.serverTimeoutInMilliseconds = 60000;
+        signalrConnection.keepAliveIntervalInMilliseconds = 14500;
         
         // Add reconnecting and reconnected handlers
         signalrConnection.onreconnecting((error) => {
