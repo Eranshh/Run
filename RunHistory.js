@@ -228,7 +228,7 @@ const WeeklyDistanceChart = ({ weeklyData }) => {
       <Text style={styles.chartTitle}>Weekly Distance Progress (km)</Text>
       <BarChart
         data={chartData}
-        width={screenWidth - 32}
+        width={screenWidth - 64}
         height={220}
         chartConfig={barChartConfig}
         style={styles.chart}
@@ -264,7 +264,7 @@ const DailyDistanceChart = ({ dailyData }) => {
       <Text style={styles.chartTitle}>Daily Distance Progress (km)</Text>
       <BarChart
         data={chartData}
-        width={screenWidth - 32}
+        width={screenWidth - 64}
         height={220}
         chartConfig={barChartConfig}
         style={styles.chart}
@@ -308,7 +308,7 @@ const PaceProgressChart = ({ runs }) => {
       <Text style={styles.chartTitle}>Pace Progress (min/km)</Text>
       <LineChart
         data={chartData}
-        width={screenWidth - 32}
+        width={screenWidth - 64}
         height={220}
         chartConfig={chartConfig}
         style={styles.chart}
@@ -726,6 +726,8 @@ const styles = StyleSheet.create({
     chart: {
         marginVertical: 8,
         borderRadius: 16,
+        paddingRight: 8,
+        paddingLeft: 8,
     },
     noDataText: {
         textAlign: 'center',
