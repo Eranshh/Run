@@ -47,23 +47,35 @@ const FloatingCoach = ({ userId, profileId, navigation, style }) => {
         }
       );
 
-      if (analysisResponse?.analysis?.recommendations?.length > 0) {
-        // Get a random recommendation
-        const randomIndex = Math.floor(Math.random() * analysisResponse.analysis.recommendations.length);
-        setRecommendation(analysisResponse.analysis.recommendations[randomIndex]);
-        setIsVisible(true);
-        animateBubble();
-      }
+             if (analysisResponse?.analysis?.recommendations?.length > 0) {
+         // Get a random recommendation
+         const randomIndex = Math.floor(Math.random() * analysisResponse.analysis.recommendations.length);
+         const selectedRecommendation = analysisResponse.analysis.recommendations[randomIndex];
+         console.log('Setting recommendation:', selectedRecommendation);
+         setRecommendation(selectedRecommendation);
+         setIsVisible(true);
+         animateBubble();
+       } else {
+         console.log('No recommendations found, using default');
+         setRecommendation('Ready for your next run? Tap to see your personalized training plan!');
+         setIsVisible(true);
+         animateBubble();
+       }
 
-    } catch (error) {
-      console.error('Error loading coach recommendation:', error);
-      // Set a default recommendation if API fails
-      setRecommendation('Ready for your next run? Tap to see your personalized training plan!');
-      setIsVisible(true);
-      animateBubble();
-    } finally {
-      setIsLoading(false);
-    }
+         } catch (error) {
+       console.error('Error loading coach recommendation:', error);
+       // Set a default recommendation if API fails
+       setRecommendation('Ready for your next run? Tap to see your personalized training plan!');
+       setIsVisible(true);
+       animateBubble();
+     } finally {
+       setIsLoading(false);
+       // Ensure bubble is visible even if loading fails
+       if (!isVisible) {
+         setIsVisible(true);
+         animateBubble();
+       }
+     }
   };
 
   const animateBubble = () => {
@@ -111,7 +123,7 @@ const FloatingCoach = ({ userId, profileId, navigation, style }) => {
       {/* Coach Icon */}
                     <TouchableOpacity style={styles.coachButton} onPress={handlePress}>
                 <View style={styles.coachIcon}>
-                  <Text style={styles.coachEmoji}>👨‍💻</Text>
+                  <Text style={styles.coachEmoji}>📣</Text>
                 </View>
               </TouchableOpacity>
     </View>
@@ -121,7 +133,7 @@ const FloatingCoach = ({ userId, profileId, navigation, style }) => {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: 100,
+    bottom: 120,
     right: 20,
     alignItems: 'flex-end',
     zIndex: 1000,
@@ -131,7 +143,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 12,
     marginBottom: 8,
-    maxWidth: screenWidth * 0.7,
+    maxWidth: screenWidth * 0.6,
+    minWidth: 200,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,

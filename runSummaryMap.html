@@ -64,6 +64,22 @@
         return;
       }
 
+      // Filter out invalid coordinates (NaN, null, undefined)
+      const validPath = path.filter(point => {
+        if (!Array.isArray(point) || point.length < 2) {
+          return false;
+        }
+        const [lng, lat] = point;
+        return !isNaN(lng) && !isNaN(lat) && lng !== null && lat !== null && lng !== undefined && lat !== undefined;
+      });
+
+      if (validPath.length === 0) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'No valid coordinates found in path'}}));
+        return;
+      }
+
+      window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Valid path length: ' + validPath.length}}));
+
       // Remove previous line if exists
       if (summaryLineSource) {
         map.sources.remove(summaryLineSource);
@@ -82,9 +98,9 @@
       }
 
       // Add start marker
-      window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Adding start marker at: ' + JSON.stringify(path[0])}}));
+      window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Adding start marker at: ' + JSON.stringify(validPath[0])}}));
       const startMarker = new atlas.HtmlMarker({
-        position: path[0],
+        position: validPath[0],
         text: '🔰',
         color: '#2ecc71'
       });
@@ -93,10 +109,10 @@
       window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Start marker added'}}));
 
       // Add finish marker if path has more than one point
-      if (path.length > 1) {
-        window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Adding finish marker at: ' + JSON.stringify(path[path.length-1])}}));
+      if (validPath.length > 1) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Adding finish marker at: ' + JSON.stringify(validPath[validPath.length-1])}}));
         const finishMarker = new atlas.HtmlMarker({
-          position: path[path.length-1],
+          position: validPath[validPath.length-1],
           text: '🏁',
           color: '#e74c3c'
         });
@@ -107,7 +123,7 @@
 
       // Draw the path
       window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Creating LineString'}}));
-      const line = new atlas.data.LineString(path);
+      const line = new atlas.data.LineString(validPath);
       window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'LineString created'}}));
       const feature = new atlas.data.Feature(line);
       window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Feature created'}}));
@@ -126,7 +142,7 @@
       window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'LineLayer added'}}));
 
       // Fit map to path bounds
-      if (path.length > 1) {
+      if (validPath.length > 1) {
         // Compute bounding box
         const bbox = atlas.data.BoundingBox.fromData(line);
         window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Bounding box: ' + JSON.stringify(bbox)}}));
@@ -138,7 +154,7 @@
       } else {
         // Only one point, just center and zoom
         map.setCamera({
-          center: path[0],
+          center: validPath[0],
           zoom: 20
         });
         window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Camera set to single point'}}));
@@ -149,6 +165,12 @@
       window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'drawPoint called. Point longitude: ' + point.longitude + 'latitude: ' + point.latitude}}));
       if (!map) {
         window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Map not ready'}}));
+        return;
+      }
+
+      // Validate coordinates
+      if (isNaN(point.longitude) || isNaN(point.latitude) || point.longitude === null || point.latitude === null || point.longitude === undefined || point.latitude === undefined) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Invalid coordinates in drawPoint: ' + JSON.stringify(point)}}));
         return;
       }
 
@@ -203,7 +225,7 @@
           } else {
             pendingTrack = { path: data.path };
           }
-        } else if (data.longitude && data.latitude) {
+        } else if (data.longitude && data.latitude && !isNaN(data.longitude) && !isNaN(data.latitude)) {
           console.log('Point received, drawing point...');
           if (mapIsReady) {
             drawPoint(data)
