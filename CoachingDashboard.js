@@ -77,9 +77,9 @@ const CoachingDashboard = ({ userId, profileId }) => {
 
       setAnalysis(analysisResponse);
 
-      // Get training plan
+      // Get AI-powered training plan
       const planResponse = await fetchWithAuth(
-        'https://runfuncionapp.azurewebsites.net/api/generate-plan',
+        'https://runfuncionapp.azurewebsites.net/api/ai-coaching',
         {
           method: 'POST',
           headers: {
@@ -87,6 +87,7 @@ const CoachingDashboard = ({ userId, profileId }) => {
           },
           body: JSON.stringify({
             userId: profileId,
+            type: 'training_plan',
             activities: activities,
             userProfile: {
               fitnessLevel: analysisResponse?.analysis?.fitnessLevel || 'beginner',
@@ -101,7 +102,7 @@ const CoachingDashboard = ({ userId, profileId }) => {
         }
       );
 
-      setTrainingPlan(planResponse);
+      setTrainingPlan(planResponse?.plan || planResponse);
 
     } catch (error) {
       console.error('Error loading coaching data:', error);
@@ -230,59 +231,69 @@ const AnalysisView = ({ analysis }) => (
 
 const TrainingPlanView = ({ plan }) => (
   <View style={styles.planContainer}>
-    {/* Current Capabilities */}
+    {/* Plan Overview */}
     <View style={styles.card}>
-      <Text style={styles.cardTitle}>Your Current Capabilities</Text>
-      <View style={styles.capabilitiesGrid}>
-        <View style={styles.capabilityItem}>
-          <Text style={styles.capabilityValue}>{(plan.currentCapabilities.maxDistance / 1000).toFixed(1)} km</Text>
-          <Text style={styles.capabilityLabel}>Max Distance</Text>
-        </View>
-        <View style={styles.capabilityItem}>
-          <Text style={styles.capabilityValue}>{plan.currentCapabilities.comfortablePace}</Text>
-          <Text style={styles.capabilityLabel}>Comfortable Pace</Text>
-        </View>
-        <View style={styles.capabilityItem}>
-          <Text style={styles.capabilityValue}>{(plan.currentCapabilities.weeklyVolume / 1000).toFixed(1)} km</Text>
-          <Text style={styles.capabilityLabel}>Weekly Volume</Text>
-        </View>
-        <View style={styles.capabilityItem}>
-          <Text style={styles.capabilityValue}>{plan.currentCapabilities.recoveryTime} days</Text>
-          <Text style={styles.capabilityLabel}>Recovery Time</Text>
-        </View>
+      <Text style={styles.cardTitle}>Your AI-Generated Training Plan</Text>
+      <Text style={styles.planOverview}>{plan.plan_overview}</Text>
+    </View>
+
+    {/* Weekly Plans */}
+    {plan.weekly_plans && plan.weekly_plans.map((weekPlan, weekIndex) => (
+      <View key={weekIndex} style={styles.card}>
+        <Text style={styles.cardTitle}>Week {weekPlan.week}: {weekPlan.focus}</Text>
+        
+        {/* Runs for this week */}
+        {weekPlan.runs && weekPlan.runs.map((run, runIndex) => (
+          <View key={runIndex} style={styles.runPlanItem}>
+            <View style={styles.runPlanHeader}>
+              <Text style={styles.runDay}>{run.day}</Text>
+              <Text style={styles.runType}>{run.type}</Text>
+            </View>
+            <View style={styles.runPlanDetails}>
+              <Text style={styles.runDistance}>{run.distance}</Text>
+              <Text style={styles.runPace}>{run.pace}</Text>
+            </View>
+            <Text style={styles.runNotes}>{run.notes}</Text>
+          </View>
+        ))}
+        
+        {/* Rest days */}
+        {weekPlan.rest_days && (
+          <View style={styles.restDaysContainer}>
+            <Text style={styles.restDaysTitle}>Rest Days:</Text>
+            <Text style={styles.restDaysText}>{weekPlan.rest_days.join(', ')}</Text>
+          </View>
+        )}
+        
+        {/* Cross training */}
+        {weekPlan.cross_training && (
+          <View style={styles.crossTrainingContainer}>
+            <Text style={styles.crossTrainingTitle}>Cross Training:</Text>
+            <Text style={styles.crossTrainingText}>{weekPlan.cross_training}</Text>
+          </View>
+        )}
       </View>
-    </View>
+    ))}
 
-    {/* Weekly Plan */}
-    <View style={styles.card}>
-      <Text style={styles.cardTitle}>This Week's Plan</Text>
-      <Text style={styles.planSummary}>
-        {plan.weeklyPlan.numberOfRuns} runs • {(plan.weeklyPlan.metrics.totalDistance / 1000).toFixed(1)} km • {Math.round(plan.weeklyPlan.metrics.totalTime)} min
-      </Text>
-      {plan.weeklyPlan.runs.map((run, index) => (
-        <View key={index} style={styles.runPlanItem}>
-          <View style={styles.runPlanHeader}>
-            <Text style={styles.runDay}>{run.day}</Text>
-            <Text style={styles.runType}>{run.type.replace('_', ' ')}</Text>
-          </View>
-          <View style={styles.runPlanDetails}>
-            <Text style={styles.runDistance}>{(run.targetDistance / 1000).toFixed(1)} km</Text>
-            <Text style={styles.runPace}>{run.targetPace} min/km</Text>
-          </View>
-          <Text style={styles.runNotes}>{run.notes}</Text>
-        </View>
-      ))}
-    </View>
+    {/* Progression Notes */}
+    {plan.progression_notes && (
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Plan Progression</Text>
+        <Text style={styles.progressionText}>{plan.progression_notes}</Text>
+      </View>
+    )}
 
-    {/* Plan Recommendations */}
-    <View style={styles.card}>
-      <Text style={styles.cardTitle}>Plan Tips</Text>
-      {plan.recommendations.map((recommendation, index) => (
-        <View key={index} style={styles.recommendationItem}>
-          <Text style={styles.recommendationText}>• {recommendation}</Text>
-        </View>
-      ))}
-    </View>
+    {/* Safety Tips */}
+    {plan.safety_tips && (
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Safety Tips</Text>
+        {plan.safety_tips.map((tip, index) => (
+          <View key={index} style={styles.recommendationItem}>
+            <Text style={styles.recommendationText}>• {tip}</Text>
+          </View>
+        ))}
+      </View>
+    )}
   </View>
 );
 
@@ -504,6 +515,46 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     fontStyle: 'italic',
+  },
+  planOverview: {
+    fontSize: 16,
+    color: '#333',
+    lineHeight: 24,
+    marginBottom: 8,
+  },
+  restDaysContainer: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  restDaysTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  restDaysText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  crossTrainingContainer: {
+    marginTop: 8,
+  },
+  crossTrainingTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  crossTrainingText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  progressionText: {
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 20,
   },
 });
 

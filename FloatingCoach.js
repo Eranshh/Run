@@ -32,9 +32,14 @@ const FloatingCoach = ({ userId, profileId, navigation, style }) => {
         `https://runfuncionapp.azurewebsites.net/api/getUsersActivities?userId=${encodeURIComponent(profileId)}`
       );
 
-      // Get analysis for recommendation
-      const analysisResponse = await fetchWithAuth(
-        'https://runfuncionapp.azurewebsites.net/api/analyze-user',
+      // Get user profile for context
+      const userProfile = await fetchWithAuth(
+        `https://runfuncionapp.azurewebsites.net/api/getUser?userId=${encodeURIComponent(profileId)}`
+      );
+
+      // Get AI-powered coaching recommendation
+      const aiResponse = await fetchWithAuth(
+        'https://runfuncionapp.azurewebsites.net/api/ai-coaching',
         {
           method: 'POST',
           headers: {
@@ -42,25 +47,30 @@ const FloatingCoach = ({ userId, profileId, navigation, style }) => {
           },
           body: JSON.stringify({
             userId: profileId,
-            activities: activities
+            type: 'recommendation',
+            activities: activities,
+            userProfile: {
+              fitnessLevel: userProfile?.fitnessLevel || 'beginner',
+              preferences: {
+                maxWeeklyRuns: userProfile?.maxWeeklyRuns || 3
+              }
+            }
           })
         }
       );
 
-             if (analysisResponse?.analysis?.recommendations?.length > 0) {
-         // Get a random recommendation
-         const randomIndex = Math.floor(Math.random() * analysisResponse.analysis.recommendations.length);
-         const selectedRecommendation = analysisResponse.analysis.recommendations[randomIndex];
-         console.log('Setting recommendation:', selectedRecommendation);
-         setRecommendation(selectedRecommendation);
-         setIsVisible(true);
-         animateBubble();
-       } else {
-         console.log('No recommendations found, using default');
-         setRecommendation('Ready for your next run? Tap to see your personalized training plan!');
-         setIsVisible(true);
-         animateBubble();
-       }
+      if (aiResponse?.coaching?.motivational_message) {
+        // Use AI-generated motivational message
+        setRecommendation(aiResponse.coaching.motivational_message);
+        console.log('AI recommendation loaded:', aiResponse.coaching.motivational_message);
+        setIsVisible(true);
+        animateBubble();
+      } else {
+        console.log('No AI recommendation found, using default');
+        setRecommendation('Ready for your next run? Tap to see your personalized training plan!');
+        setIsVisible(true);
+        animateBubble();
+      }
 
          } catch (error) {
        console.error('Error loading coach recommendation:', error);
