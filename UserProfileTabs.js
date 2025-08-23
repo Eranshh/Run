@@ -4,6 +4,7 @@ import { TabView } from 'react-native-tab-view';
 import RunHistory from './RunHistory'
 import FutureEvents from './FutureEvents';
 import FriendsScreen from './FriendsScreen';
+import CoachingDashboard from './CoachingDashboard';
 
 
 export default function userProfileTabs({ navigation, userId, profileId }) {
@@ -14,6 +15,7 @@ export default function userProfileTabs({ navigation, userId, profileId }) {
         { key: 'History', title: 'History' },
         { key: 'Future Events', title: 'Future Events' },
         { key: 'Friends', title: 'Friends' },
+        { key: 'Coach', title: 'Coach' },
     ];
 
     const renderScene = ({ route }) => {
@@ -31,6 +33,12 @@ export default function userProfileTabs({ navigation, userId, profileId }) {
                         />
             case 'Friends':
                 return <FriendsScreen
+                        navigation={navigation}
+                        userId={userId}
+                        profileId={profileId}
+                        />
+            case 'Coach':
+                return <CoachingDashboard
                         navigation={navigation}
                         userId={userId}
                         profileId={profileId}

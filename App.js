@@ -19,6 +19,8 @@ import RunSummaryScreen from './RunSummaryScreen';
 import SelectTrackScreen from './SelectTrackScreen';
 import UserSearchScreen from './UserSearchScreen';
 import EventScreen from './EventScreen';
+import CoachingDashboard from './CoachingDashboard';
+import FloatingCoach from './FloatingCoach';
 
 const Stack = createNativeStackNavigator();
 
@@ -694,6 +696,13 @@ const getAllTracks = async () => {
             <Text style={styles.fabText}>🏃</Text>
           </TouchableOpacity>
         )}
+        {mode === "mainMap" && !isSheetVisible && (
+          <FloatingCoach
+            userId={userId}
+            profileId={userId}
+            navigation={navigation}
+          />
+        )}
         <CreateEventSheet
           ref={sheetRef}
           onSubmit={handleSubmitEvent}
@@ -1030,6 +1039,27 @@ export default function App() {
                   {...props}
                   userId={userId}
                   connection={connection}
+                />
+              )}
+            </Stack.Screen>
+            <Stack.Screen
+              name="CoachingDashboard"
+              options={{
+                title: 'Your Coach',
+                headerStyle: {
+                  backgroundColor: '#007AFF',
+                },
+                headerTintColor: '#fff',
+                headerTitleStyle: {
+                  fontWeight: 'bold',
+                },
+              }}
+            >
+              {props => (
+                <CoachingDashboard
+                  {...props}
+                  userId={userId}
+                  profileId={userId}
                 />
               )}
             </Stack.Screen>
