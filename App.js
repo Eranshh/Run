@@ -14,7 +14,7 @@ import RegisterScreen from './RegisterScreen';
 import { get } from 'react-native/Libraries/TurboModule/TurboModuleRegistry';
 import { ConsoleLogger } from '@microsoft/signalr/dist/esm/Utils';
 import UserProfileScreen from './UserProfileScreen';
-import { fetchWithAuth, setEventReady, markUserReady, getEventReadyUsers, startEvent, updateRunnerPosition, getEventRunnersPositions, endEventRun, leaveEvent } from './utils/api';
+import { fetchWithAuth, setEventReady, markUserReady, getEventReadyUsers, startEvent, updateRunnerPosition, getEventRunnersPositions, endEventRun, leaveEvent, deleteEvent, joinEvent } from './utils/api';
 import RunSummaryScreen from './RunSummaryScreen';
 import SelectTrackScreen from './SelectTrackScreen';
 import UserSearchScreen from './UserSearchScreen';
@@ -25,7 +25,7 @@ import FloatingCoach from './FloatingCoach';
 const Stack = createNativeStackNavigator();
 
 
-function MainScreen({ navigation, username, userId, userToken, route, connection }) {
+function MainScreen({ navigation, username, userId, userToken, route, connection, connectionState, onRetryConnection }) {
   const [tracks, setTracks] = useState([]);
   const [selectedTrack, setSelectedTrack] = useState(null);
   const [selectedLocation, setSelectedLocation] = useState(null);
@@ -35,6 +35,7 @@ function MainScreen({ navigation, username, userId, userToken, route, connection
   const [currentEventRun, setCurrentEventRun] = useState(null); // New state for current event run
   const [eventRunners, setEventRunners] = useState([]); // New state for tracking all runners in event
   const [listenersUp, setListenersUp] = useState(false);
+  const [pendingEventData, setPendingEventData] = useState(null); // Store event data when WebView isn't ready
 
   // Add refs to always have latest state in event handlers
   const modeRef = useRef(mode);
@@ -60,11 +61,15 @@ function MainScreen({ navigation, username, userId, userToken, route, connection
       if (routeMode === 'freeRun') {
         // Start free run
         console.log('Starting free run from route params');
-        webViewRef.current?.postMessage(JSON.stringify({ type: 'startFreeRun' }));
+        if (webViewRef.current) {
+          webViewRef.current.postMessage(JSON.stringify({ type: 'startFreeRun' }));
+        }
       } else if (routeMode === 'guidedRun' && routeSelectedTrack) {
         // Handle guided run with selected track
         console.log('Starting guided run with track:', routeSelectedTrack);
-        webViewRef.current?.postMessage(JSON.stringify({ type: 'startGuidedRun', trackId: routeSelectedTrack.trackId }))
+        if (webViewRef.current) {
+          webViewRef.current.postMessage(JSON.stringify({ type: 'startGuidedRun', trackId: routeSelectedTrack.trackId }))
+        }
       }
       
       // Mark as handled to prevent re-triggering
@@ -141,10 +146,14 @@ function MainScreen({ navigation, username, userId, userToken, route, connection
         
         // Send to WebView (only for other runners)
         console.log("Sending position update to WebView for other runner:", positionData);
-        webViewRef.current.postMessage(JSON.stringify({
-          type: 'updateRunnerPosition',
-          data: positionData
-        }));
+        if (webViewRef.current) {
+          webViewRef.current.postMessage(JSON.stringify({
+            type: 'updateRunnerPosition',
+            data: positionData
+          }));
+        } else {
+          console.log('WebView not ready, skipping position update');
+        }
       } catch (err) {
         console.error("Error handling runnerPositionUpdate message:", err);
       }
@@ -181,10 +190,14 @@ function MainScreen({ navigation, username, userId, userToken, route, connection
         
         // Send to WebView to remove the runner marker (only for other runners)
         console.log("Removing runner marker from WebView for other runner:", removalData.userId);
-        webViewRef.current.postMessage(JSON.stringify({
-          type: 'removeRunner',
-          data: { userId: removalData.userId }
-        }));
+        if (webViewRef.current) {
+          webViewRef.current.postMessage(JSON.stringify({
+            type: 'removeRunner',
+            data: { userId: removalData.userId }
+          }));
+        } else {
+          console.log('WebView not ready, skipping runner removal');
+        }
       } catch (err) {
         console.error("Error handling runnerRemoved message:", err);
       }
@@ -264,9 +277,9 @@ function MainScreen({ navigation, username, userId, userToken, route, connection
   }, []);
 
   useEffect(() => {
-    if (mapReady && username) {
+    if (mapReady && username && webViewRef.current) {
       // Send user ID to WebView for proper filtering
-      webViewRef.current?.postMessage(
+      webViewRef.current.postMessage(
         JSON.stringify({
           type: 'userIdentity',
           username: username,
@@ -275,6 +288,35 @@ function MainScreen({ navigation, username, userId, userToken, route, connection
       );
     }
   }, [mapReady, username, userId]);
+
+  // Handle pending event data when map becomes ready
+  useEffect(() => {
+    if (mapReady && pendingEventData && webViewRef.current) {
+      console.log('Handling pending event data now that map is ready');
+      
+      // Set current event run state
+      setCurrentEventRun({
+        eventId: pendingEventData.eventId,
+        trackId: pendingEventData.trackId,
+        startedAt: pendingEventData.startedAt
+      });
+      
+      // Enter event run
+      setMode("eventRun");
+      
+      // Notify WebView to start event run
+      webViewRef.current.postMessage(JSON.stringify({
+        type: 'startEventRun',
+        data: pendingEventData
+      }));
+      
+      // Start tracking position updates for this event
+      startEventPositionTracking(pendingEventData.eventId);
+      
+      // Clear pending event data
+      setPendingEventData(null);
+    }
+  }, [mapReady, pendingEventData]);
 
   const createEvent = async (event) => {
     try {
@@ -298,7 +340,7 @@ function MainScreen({ navigation, username, userId, userToken, route, connection
   const getAllOpenEvents = async () => {
     try {
       const data = await fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/getAllOpenEvents');
-      console.log('Got Events:', data);
+      //console.log('Got Events:', data);
       eventList.events = data.map((event) => ({
         latitude: event.latitude,
         longitude: event.longitude,
@@ -311,8 +353,10 @@ function MainScreen({ navigation, username, userId, userToken, route, connection
         host: event.trainerId,
         status: event.status,
       }));
-      console.log('Event list:', eventList);
-      webViewRef.current.postMessage(JSON.stringify(eventList));
+      //console.log('Event list:', eventList);
+      if (webViewRef.current) {
+        webViewRef.current.postMessage(JSON.stringify(eventList));
+      }
     } catch (error) {
       console.log('Error fetching events:', error);
       // Handle error appropriately
@@ -324,7 +368,7 @@ function MainScreen({ navigation, username, userId, userToken, route, connection
     const data = await fetchWithAuth(
       `https://runfuncionapp.azurewebsites.net/api/getUsersEvents?userId=${encodeURIComponent(userId)}`
     );
-    console.log('Got Events:', data);
+    //console.log('Got Events:', data);
     let myEvents = data.map((event) => ({
       latitude: event.latitude,
       longitude: event.longitude,
@@ -338,7 +382,9 @@ function MainScreen({ navigation, username, userId, userToken, route, connection
       status: event.status,
     }));
     let myEventsList = {type: 'usersEvents', events: myEvents};
-    webViewRef.current.postMessage(JSON.stringify(myEventsList));
+    if (webViewRef.current) {
+      webViewRef.current.postMessage(JSON.stringify(myEventsList));
+    }
     
   } catch (error) {
     console.log('Error fetching user events:', error);
@@ -349,11 +395,13 @@ function MainScreen({ navigation, username, userId, userToken, route, connection
 const getAllTracks = async () => {
     try {
       const data = await fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/getAllTracks');
-      console.log('Got Tracks:', data);
+      //console.log('Got Tracks:', data);
       //console.log('first point:', data[0].path[0]);
       const trackIds = data.map(track => track.trackId);
       setTracks(trackIds);
-      webViewRef.current.postMessage(JSON.stringify({'type': "tracks", 'tracks': data}));
+      if (webViewRef.current) {
+        webViewRef.current.postMessage(JSON.stringify({'type': "tracks", 'tracks': data}));
+      }
     } catch (error) {
       console.log('Error fetching tracks:', error);
       // Handle error appropriately
@@ -424,7 +472,9 @@ const getAllTracks = async () => {
   const handleSelectLocation = () => {
     console.log("Entering location select mode");
     setMode("selectingLocation");
-    webViewRef.current.postMessage(JSON.stringify({ type: 'startSelectingLocation' }));
+    if (webViewRef.current) {
+      webViewRef.current.postMessage(JSON.stringify({ type: 'startSelectingLocation' }));
+    }
   };
 
   const openEventSheet = () => {
@@ -471,7 +521,6 @@ const getAllTracks = async () => {
       
       if (isParticipant) {
         console.log('Starting event run for participant');
-        navigation.popToTop();
         // Set current event run state
         setCurrentEventRun({
           eventId: eventData.eventId,
@@ -481,16 +530,23 @@ const getAllTracks = async () => {
         
         // Enter event run
         setMode("eventRun");
+        // Navigate to main map to ensure we're on the correct screen
         navigation.navigate("mainMap");
         
-        // Notify WebView to start event run
-        webViewRef.current.postMessage(JSON.stringify({
-          type: 'startEventRun',
-          data: eventData
-        }));
-        
-        // Start tracking position updates for this event
-        startEventPositionTracking(eventData.eventId);
+        // Notify WebView to start event run (only if WebView is ready)
+        if (webViewRef.current && mapReady) {
+          webViewRef.current.postMessage(JSON.stringify({
+            type: 'startEventRun',
+            data: eventData
+          }));
+          
+          // Start tracking position updates for this event
+          startEventPositionTracking(eventData.eventId);
+        } else {
+          console.log('WebView not ready yet, will start event run when map is ready');
+          // Store the event data to start when map becomes ready
+          setPendingEventData(eventData);
+        }
       } else {
         console.log('User is not a participant in this event');
       }
@@ -517,10 +573,14 @@ const getAllTracks = async () => {
       
       // Send filtered runners data to WebView (even if empty)
       console.log('Sending filtered runners data to WebView:', otherRunners);
-      webViewRef.current.postMessage(JSON.stringify({
-        type: 'updateEventRunners',
-        data: otherRunners
-      }));
+      if (webViewRef.current) {
+        webViewRef.current.postMessage(JSON.stringify({
+          type: 'updateEventRunners',
+          data: otherRunners
+        }));
+      } else {
+        console.log('WebView not ready, skipping runners data update');
+      }
     } catch (error) {
       console.error('Error getting event runners positions:', error);
     }
@@ -571,7 +631,9 @@ const getAllTracks = async () => {
       setCurrentEventRun(null);
       setEventRunners([]);
       setMode("mainMap");
-      webViewRef.current.postMessage(JSON.stringify({type: 'eventRunEnded'}));
+      if (webViewRef.current) {
+        webViewRef.current.postMessage(JSON.stringify({type: 'eventRunEnded'}));
+      }
       getAllOpenEvents();
       
     } catch (error) {
@@ -584,7 +646,7 @@ const getAllTracks = async () => {
   const handleWebViewMessage = (event) => {
     try {
         const data = JSON.parse(event.nativeEvent.data);
-        console.log('Received message from WebView:', data);
+        //console.log('Received message from WebView:', data);
 
         if (data.data.action === "delete") {
           console.log('Delete event:', data.data.id);
@@ -595,10 +657,13 @@ const getAllTracks = async () => {
         }
         else if (data.data.action === "getEvents") {
           getAllOpenEvents();
-          webViewRef.current.postMessage(JSON.stringify(eventList));
+          if (webViewRef.current) {
+            webViewRef.current.postMessage(JSON.stringify(eventList));
+          }
         } else if (data.data.action === "getUserLocation") {
           //console.log("sending location");
-          getUserLocation();
+          // getUserLocation function is not implemented yet
+          console.log("getUserLocation requested but not implemented");
         } else if (data.data.action === "navigateToProfile") {
           navigation.navigate('UserProfile', { profileId: userId });
         } else if (data.data.action === "confirmLocation") {
@@ -684,6 +749,28 @@ const getAllTracks = async () => {
         }}
         onMessage={handleWebViewMessage}
         />
+        {/* Connection Status Indicator */}
+        {connectionState !== 'connected' && (
+          <View style={styles.connectionStatus}>
+            <View style={[
+              styles.connectionIndicator, 
+              { backgroundColor: connectionState === 'connected' ? '#4CAF50' : 
+                                connectionState === 'connecting' || connectionState === 'reconnecting' ? '#FF9800' : 
+                                connectionState === 'failed' ? '#F44336' : '#9E9E9E' }
+            ]} />
+            <Text style={styles.connectionText}>
+              {connectionState === 'connected' ? 'Connected' :
+               connectionState === 'connecting' ? 'Connecting...' :
+               connectionState === 'reconnecting' ? 'Reconnecting...' :
+               connectionState === 'failed' ? 'Connection Failed' : 'Disconnected'}
+            </Text>
+            {(connectionState === 'failed' || connectionState === 'disconnected') && onRetryConnection && (
+              <TouchableOpacity style={styles.retryButton} onPress={onRetryConnection}>
+                <Text style={styles.retryButtonText}>Retry</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
         {mode === "mainMap" && !isSheetVisible && (
           <TouchableOpacity id="createEventBtn" style={styles.fab} onPress={openEventSheet}>
             <Text style={styles.fabText}>+</Text>
@@ -776,6 +863,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#fff',
   },
+  connectionStatus: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    borderRadius: 8,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 1001,
+  },
+  connectionIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  connectionText: {
+    color: 'white',
+    fontSize: 14,
+    flex: 1,
+  },
+  retryButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
 });
 
 export default function App() {
@@ -784,9 +905,20 @@ export default function App() {
   const [userId, setUserId] = useState(null);
   const [username, setUsername] = useState(null);
   const [connection, setConnection] = useState(null);
+  const [connectionState, setConnectionState] = useState('disconnected'); // disconnected, connecting, connected, reconnecting
+  const [connectionRetryCount, setConnectionRetryCount] = useState(0);
+  const maxRetries = 5;
 
   const handleLogout = async () => {
     try {
+      // Clean up SignalR connection
+      if (connection) {
+        await connection.stop();
+        setConnection(null);
+      }
+      setConnectionState('disconnected');
+      setConnectionRetryCount(0);
+      
       await AsyncStorage.multiRemove(['userToken', 'userId', 'username']);
       setUserToken(null);
       setUserId(null);
@@ -794,6 +926,12 @@ export default function App() {
     } catch (error) {
       console.error('Error during logout:', error);
     }
+  };
+
+  const retrySignalRConnection = () => {
+    console.log("Manual SignalR connection retry requested");
+    setConnectionRetryCount(0);
+    setConnectionState('disconnected');
   };
 
   const handleLogin = async (token, userId, username) => {
@@ -848,47 +986,159 @@ export default function App() {
 
   useEffect(() => {
     const connectToSignalR = async () => {
-      try {
-        // STEP 1: Call backend negotiate endpoint to get URL + token
-        const res = await fetch("https://runfuncionapp.azurewebsites.net/api/negotiate");
-        if (!res.ok) throw new Error("Failed to fetch SignalR info");
+      if (connectionRetryCount >= maxRetries) {
+        console.error("Max SignalR connection retries reached");
+        setConnectionState('failed');
+        return;
+      }
 
-        const { url, accessToken } = await res.json();
+      try {
+        setConnectionState('connecting');
+        console.log(`Attempting SignalR connection (attempt ${connectionRetryCount + 1}/${maxRetries})`);
+        
+                 // STEP 1: Call backend negotiate endpoint to get URL + token
+         const controller = new AbortController();
+         const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+         
+         let url, accessToken;
+         try {
+           const res = await fetch("https://runfuncionapp.azurewebsites.net/api/negotiate", {
+             method: 'GET',
+             headers: {
+               'Content-Type': 'application/json',
+             },
+             signal: controller.signal,
+           });
+           
+           clearTimeout(timeoutId);
+         
+           if (!res.ok) {
+             throw new Error(`Failed to fetch SignalR info: ${res.status} ${res.statusText}`);
+           }
+
+           const responseData = await res.json();
+           url = responseData.url;
+           accessToken = responseData.accessToken;
+           console.log("SignalR negotiate response received");
+           
+           if (!url || !accessToken) {
+             throw new Error("Invalid SignalR negotiate response - missing URL or access token");
+           }
+         } catch (fetchError) {
+           clearTimeout(timeoutId);
+           if (fetchError.name === 'AbortError') {
+             throw new Error("SignalR negotiate request timed out");
+           }
+           throw fetchError;
+         }
 
         // STEP 2: Use the returned info to connect
         const signalrConnection = new SignalR.HubConnectionBuilder()
           .withUrl(url, {
             accessTokenFactory: () => accessToken,
+            skipNegotiation: false,
+            transport: SignalR.HttpTransportType.WebSockets
           })
-          .withAutomaticReconnect([0, 2000, 5000, 10000, 30000]) // Retry after 0s, 2s, 5s, 10s, then every 30s
-          .configureLogging(SignalR.LogLevel.Information)
+          .withAutomaticReconnect({
+            nextRetryDelayInMilliseconds: (retryContext) => {
+              // Custom retry logic
+              if (retryContext.previousRetryCount === 0) {
+                return 0; // Immediate retry
+              }
+              if (retryContext.previousRetryCount < 3) {
+                return 2000; // 2 seconds
+              }
+              if (retryContext.previousRetryCount < 5) {
+                return 5000; // 5 seconds
+              }
+              return 10000; // 10 seconds
+            }
+          })
+          .configureLogging(SignalR.LogLevel.Warning) // Reduce log noise
           .build();
         
-        signalrConnection.serverTimeoutInMilliseconds = 60000;
+        signalrConnection.serverTimeoutInMilliseconds = 120000;
         signalrConnection.keepAliveIntervalInMilliseconds = 14500;
         
-        // Add reconnecting and reconnected handlers
+        // Add connection state handlers
         signalrConnection.onreconnecting((error) => {
           console.log("SignalR reconnecting:", error);
+          setConnectionState('reconnecting');
         });
 
         signalrConnection.onreconnected((connectionId) => {
           console.log("SignalR reconnected:", connectionId);
+          setConnectionState('connected');
+          setConnectionRetryCount(0); // Reset retry count on successful connection
         });
 
-        signalrConnection.onclose(() => {
-          console.log("SignalR connection closed.");
+        signalrConnection.onclose((error) => {
+          console.log("SignalR connection closed:", error);
+          setConnectionState('disconnected');
+          
+          // Attempt to reconnect if not at max retries
+          if (connectionRetryCount < maxRetries) {
+            setTimeout(() => {
+              setConnectionRetryCount(prev => prev + 1);
+            }, 2000);
+          }
         });
 
+        // Note: Connection health monitoring could be added here if the server supports ping/pong
+
+        // Start the connection
         await signalrConnection.start();
-        console.log("SignalR connected.");
+        console.log("SignalR connected successfully");
         setConnection(signalrConnection);
-      } catch (error) {
-        console.error("SignalR setup failed:", error);
+        setConnectionState('connected');
+        setConnectionRetryCount(0);
+        
+              } catch (error) {
+          console.error("SignalR setup failed:", error);
+          
+          // Provide more specific error messages
+          let errorMessage = "SignalR connection failed";
+          if (error.message.includes("timeout")) {
+            errorMessage = "Connection timeout - please check your internet connection";
+          } else if (error.message.includes("Failed to fetch")) {
+            errorMessage = "Network error - please check your internet connection";
+          } else if (error.message.includes("WebSocket failed to connect")) {
+            errorMessage = "WebSocket connection failed - server may be unavailable";
+          }
+          
+          console.log("Error details:", errorMessage);
+          setConnectionState('disconnected');
+        
+        // Retry logic
+        if (connectionRetryCount < maxRetries) {
+          const retryDelay = Math.min(2000 * Math.pow(2, connectionRetryCount), 10000); // Exponential backoff, max 10s
+          console.log(`Retrying SignalR connection in ${retryDelay}ms`);
+          
+          setTimeout(() => {
+            setConnectionRetryCount(prev => prev + 1);
+          }, retryDelay);
+        } else {
+          console.error("Max SignalR connection retries reached");
+          setConnectionState('failed');
+        }
       }
+    };
+
+    // Only attempt connection if we have a user token
+    if (userToken && connectionState === 'disconnected') {
+      connectToSignalR();
     }
-    connectToSignalR();
-  }, []);
+  }, [userToken, connectionRetryCount, connectionState]);
+
+  // Cleanup effect to dispose of connection when component unmounts or user logs out
+  useEffect(() => {
+    return () => {
+      if (connection) {
+        console.log("Cleaning up SignalR connection");
+        connection.stop();
+      }
+    };
+  }, [connection]);
 
   if (isLoading) {
     return (
@@ -935,6 +1185,8 @@ export default function App() {
                   userId={userId}
                   userToken={userToken}
                   connection={connection}
+                  connectionState={connectionState}
+                  onRetryConnection={retrySignalRConnection}
                 />
               )}
             </Stack.Screen>

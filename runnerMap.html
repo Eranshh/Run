@@ -408,7 +408,7 @@
                             usersEvents = data.events || [];
 
                             console.log('Received users events:', usersEvents);
-                            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Received users events:' + usersEvents}}));
+                            //window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Received users events:' + usersEvents}}));
                             window.myEvents = []; // Reset my events
                             usersEvents.forEach(event => {
                                 window.myEvents.push({ id: event.id, name: event.name, latitude: event.latitude, longitude: event.longitude });
@@ -448,7 +448,7 @@
                             console.log('Received track list:', data.data);
                             const tracks  = data.tracks || [];
                             window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: 'Received track list'}}));
-                            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: data.tracks}}));
+                            //window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'log', message: data.tracks}}));
                             window.tracks = tracks; // Add this line
                             for (let i = 0; i < tracks.length; i++) {
                                 const { path, id } = tracks[i];
