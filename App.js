@@ -340,7 +340,7 @@ function MainScreen({ navigation, username, userId, userToken, route, connection
   const getAllOpenEvents = async () => {
     try {
       const data = await fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/getAllOpenEvents');
-      console.log('Got Events:', data);
+      //console.log('Got Events:', data);
       eventList.events = data.map((event) => ({
         latitude: event.latitude,
         longitude: event.longitude,
@@ -353,7 +353,7 @@ function MainScreen({ navigation, username, userId, userToken, route, connection
         host: event.trainerId,
         status: event.status,
       }));
-      console.log('Event list:', eventList);
+      //console.log('Event list:', eventList);
       if (webViewRef.current) {
         webViewRef.current.postMessage(JSON.stringify(eventList));
       }
@@ -368,7 +368,7 @@ function MainScreen({ navigation, username, userId, userToken, route, connection
     const data = await fetchWithAuth(
       `https://runfuncionapp.azurewebsites.net/api/getUsersEvents?userId=${encodeURIComponent(userId)}`
     );
-    console.log('Got Events:', data);
+    //console.log('Got Events:', data);
     let myEvents = data.map((event) => ({
       latitude: event.latitude,
       longitude: event.longitude,
@@ -395,7 +395,7 @@ function MainScreen({ navigation, username, userId, userToken, route, connection
 const getAllTracks = async () => {
     try {
       const data = await fetchWithAuth('https://runfuncionapp.azurewebsites.net/api/getAllTracks');
-      console.log('Got Tracks:', data);
+      //console.log('Got Tracks:', data);
       //console.log('first point:', data[0].path[0]);
       const trackIds = data.map(track => track.trackId);
       setTracks(trackIds);
@@ -646,7 +646,7 @@ const getAllTracks = async () => {
   const handleWebViewMessage = (event) => {
     try {
         const data = JSON.parse(event.nativeEvent.data);
-        console.log('Received message from WebView:', data);
+        //console.log('Received message from WebView:', data);
 
         if (data.data.action === "delete") {
           console.log('Delete event:', data.data.id);
