@@ -75,7 +75,35 @@ const CoachingDashboard = ({ userId, profileId }) => {
         }
       );
 
-      setAnalysis(analysisResponse);
+      // Get AI-powered recommendations for analysis
+      const aiRecommendationsResponse = await fetchWithAuth(
+        'https://runfuncionapp.azurewebsites.net/api/ai-coaching',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId: profileId,
+            type: 'recommendation',
+            activities: activities,
+            userProfile: {
+              fitnessLevel: analysisResponse?.analysis?.fitnessLevel || 'beginner',
+              preferences: {
+                maxWeeklyRuns: 4
+              }
+            }
+          })
+        }
+      );
+
+      // Combine the analysis with AI recommendations
+      const enhancedAnalysis = {
+        ...analysisResponse,
+        aiRecommendations: aiRecommendationsResponse?.coaching || null
+      };
+
+      setAnalysis(enhancedAnalysis);
 
       // Get AI-powered training plan
       const planResponse = await fetchWithAuth(
@@ -147,7 +175,7 @@ const CoachingDashboard = ({ userId, profileId }) => {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {activeTab === 'analysis' && analysis && (
-          <AnalysisView analysis={analysis.analysis} />
+          <AnalysisView analysis={analysis.analysis} aiRecommendations={analysis.aiRecommendations} />
         )}
         
         {activeTab === 'plan' && trainingPlan && (
@@ -158,7 +186,8 @@ const CoachingDashboard = ({ userId, profileId }) => {
   );
 };
 
-const AnalysisView = ({ analysis }) => (
+const AnalysisView = ({ analysis, aiRecommendations }) => {
+  return (
   <View style={styles.analysisContainer}>
     {/* Fitness Level Card */}
     <View style={styles.card}>
@@ -217,17 +246,52 @@ const AnalysisView = ({ analysis }) => (
       </View>
     </View>
 
-    {/* Recommendations */}
-    <View style={styles.card}>
-      <Text style={styles.cardTitle}>Coach's Recommendations</Text>
-      {analysis.recommendations.map((recommendation, index) => (
-        <View key={index} style={styles.recommendationItem}>
-          <Text style={styles.recommendationText}>• {recommendation}</Text>
+    {/* AI Recommendations */}
+    {aiRecommendations ? (
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>🤖 AI Coach's Analysis</Text>
+        
+        {/* Motivational Message */}
+        <View style={styles.motivationalContainer}>
+          <Text style={styles.motivationalText}>{aiRecommendations.motivational_message}</Text>
         </View>
-      ))}
-    </View>
+
+        {/* Weekly Focus */}
+        <View style={styles.focusContainer}>
+          <Text style={styles.focusTitle}>This Week's Focus:</Text>
+          <Text style={styles.focusText}>{aiRecommendations.weekly_focus}</Text>
+        </View>
+
+        {/* Recommendations */}
+        <View style={styles.recommendationsContainer}>
+          <Text style={styles.recommendationsTitle}>Personalized Recommendations:</Text>
+          {aiRecommendations.recommendations.map((recommendation, index) => (
+            <View key={index} style={styles.recommendationItem}>
+              <Text style={styles.recommendationText}>• {recommendation}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Next Run Tip */}
+        <View style={styles.tipContainer}>
+          <Text style={styles.tipTitle}>💡 Next Run Tip:</Text>
+          <Text style={styles.tipText}>{aiRecommendations.next_run_tip}</Text>
+        </View>
+      </View>
+    ) : (
+      /* Fallback to original recommendations if AI is not available */
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Coach's Recommendations</Text>
+        {analysis.recommendations.map((recommendation, index) => (
+          <View key={index} style={styles.recommendationItem}>
+            <Text style={styles.recommendationText}>• {recommendation}</Text>
+          </View>
+        ))}
+      </View>
+    )}
   </View>
-);
+  );
+};
 
 const TrainingPlanView = ({ plan }) => (
   <View style={styles.planContainer}>
@@ -554,6 +618,63 @@ const styles = StyleSheet.create({
   progressionText: {
     fontSize: 14,
     color: '#333',
+    lineHeight: 20,
+  },
+  // AI Recommendations Styles
+  motivationalContainer: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#007AFF',
+  },
+  motivationalText: {
+    fontSize: 16,
+    color: '#333',
+    fontStyle: 'italic',
+    lineHeight: 22,
+    textAlign: 'center',
+  },
+  focusContainer: {
+    marginBottom: 16,
+  },
+  focusTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  focusText: {
+    fontSize: 14,
+    color: '#007AFF',
+    fontWeight: '500',
+  },
+  recommendationsContainer: {
+    marginBottom: 16,
+  },
+  recommendationsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  tipContainer: {
+    backgroundColor: '#fff3cd',
+    borderRadius: 8,
+    padding: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#ffc107',
+  },
+  tipTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#856404',
+    marginBottom: 4,
+  },
+  tipText: {
+    fontSize: 14,
+    color: '#856404',
     lineHeight: 20,
   },
 });
