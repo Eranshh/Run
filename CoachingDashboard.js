@@ -130,6 +130,8 @@ const CoachingDashboard = ({ userId, profileId }) => {
         }
       );
 
+      console.log('Training Plan Response:', planResponse);
+      console.log('Training Plan Data:', planResponse?.plan || planResponse);
       setTrainingPlan(planResponse?.plan || planResponse);
 
     } catch (error) {
@@ -293,7 +295,10 @@ const AnalysisView = ({ analysis, aiRecommendations }) => {
   );
 };
 
-const TrainingPlanView = ({ plan }) => (
+const TrainingPlanView = ({ plan }) => {
+  console.log('TrainingPlanView received plan:', plan);
+  
+  return (
   <View style={styles.planContainer}>
     {/* Plan Overview */}
     <View style={styles.card}>
@@ -359,7 +364,8 @@ const TrainingPlanView = ({ plan }) => (
       </View>
     )}
   </View>
-);
+  );
+};
 
 const styles = StyleSheet.create({
   container: {
