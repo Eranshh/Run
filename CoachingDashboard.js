@@ -235,13 +235,13 @@ const AnalysisView = ({ analysis, aiRecommendations }) => {
     <View style={styles.card}>
       <Text style={styles.cardTitle}>Your Fitness Level</Text>
       <View style={styles.fitnessLevelContainer}>
-        <View style={[styles.levelBadge, { backgroundColor: getFitnessLevelColor(analysis.fitnessLevel) }]}>
-          <Text style={styles.levelText}>{analysis.fitnessLevel.toUpperCase()}</Text>
+        <View style={[styles.levelBadge, { backgroundColor: getFitnessLevelColor(analysis?.fitnessLevel || 'beginner') }]}>
+          <Text style={styles.levelText}>{(analysis?.fitnessLevel || 'beginner').toUpperCase()}</Text>
         </View>
         <Text style={styles.levelDescription}>
-          {analysis.fitnessLevel === 'beginner' && 'Great start! Focus on building consistency and endurance.'}
-          {analysis.fitnessLevel === 'intermediate' && 'You\'re making good progress! Ready for more structured training.'}
-          {analysis.fitnessLevel === 'advanced' && 'Excellent! You\'re ready for advanced training techniques.'}
+          {(analysis?.fitnessLevel || 'beginner') === 'beginner' && 'Great start! Focus on building consistency and endurance.'}
+          {(analysis?.fitnessLevel || 'beginner') === 'intermediate' && 'You\'re making good progress! Ready for more structured training.'}
+          {(analysis?.fitnessLevel || 'beginner') === 'advanced' && 'Excellent! You\'re ready for advanced training techniques.'}
         </Text>
       </View>
     </View>
@@ -251,19 +251,21 @@ const AnalysisView = ({ analysis, aiRecommendations }) => {
       <Text style={styles.cardTitle}>Your Stats</Text>
       <View style={styles.metricsGrid}>
         <View style={styles.metricItem}>
-          <Text style={styles.metricValue}>{(analysis.metrics.totalDistance / 1000).toFixed(1)}</Text>
+          <Text style={styles.metricValue}>
+            {analysis?.metrics?.totalDistance ? (analysis.metrics.totalDistance / 1000).toFixed(1) : '0.0'}
+          </Text>
           <Text style={styles.metricLabel}>Total km</Text>
         </View>
         <View style={styles.metricItem}>
-          <Text style={styles.metricValue}>{analysis.metrics.totalRuns}</Text>
+          <Text style={styles.metricValue}>{analysis?.metrics?.totalRuns || 0}</Text>
           <Text style={styles.metricLabel}>Total runs</Text>
         </View>
         <View style={styles.metricItem}>
-          <Text style={styles.metricValue}>{analysis.metrics.averagePace || 'N/A'}</Text>
+          <Text style={styles.metricValue}>{analysis?.metrics?.averagePace || 'N/A'}</Text>
           <Text style={styles.metricLabel}>Avg pace</Text>
         </View>
         <View style={styles.metricItem}>
-          <Text style={styles.metricValue}>{analysis.metrics.weeklyAverage}</Text>
+          <Text style={styles.metricValue}>{analysis?.metrics?.weeklyAverage || 0}</Text>
           <Text style={styles.metricLabel}>Runs/week</Text>
         </View>
       </View>
@@ -275,14 +277,14 @@ const AnalysisView = ({ analysis, aiRecommendations }) => {
       <View style={styles.indicatorContainer}>
         <View style={styles.indicator}>
           <Text style={styles.indicatorLabel}>Consistency</Text>
-          <View style={[styles.indicatorBadge, { backgroundColor: getConsistencyColor(analysis.consistency) }]}>
-            <Text style={styles.indicatorText}>{analysis.consistency}</Text>
+          <View style={[styles.indicatorBadge, { backgroundColor: getConsistencyColor(analysis?.consistency || 'low') }]}>
+            <Text style={styles.indicatorText}>{analysis?.consistency || 'low'}</Text>
           </View>
         </View>
         <View style={styles.indicator}>
           <Text style={styles.indicatorLabel}>Progress</Text>
-          <View style={[styles.indicatorBadge, { backgroundColor: getProgressColor(analysis.progress) }]}>
-            <Text style={styles.indicatorText}>{analysis.progress}</Text>
+          <View style={[styles.indicatorBadge, { backgroundColor: getProgressColor(analysis?.progress || 'stable') }]}>
+            <Text style={styles.indicatorText}>{analysis?.progress || 'stable'}</Text>
           </View>
         </View>
       </View>
@@ -295,19 +297,19 @@ const AnalysisView = ({ analysis, aiRecommendations }) => {
         
         {/* Motivational Message */}
         <View style={styles.motivationalContainer}>
-          <Text style={styles.motivationalText}>{aiRecommendations.motivational_message}</Text>
+          <Text style={styles.motivationalText}>{aiRecommendations?.motivational_message || 'Keep up the great work!'}</Text>
         </View>
 
         {/* Weekly Focus */}
         <View style={styles.focusContainer}>
           <Text style={styles.focusTitle}>This Week's Focus:</Text>
-          <Text style={styles.focusText}>{aiRecommendations.weekly_focus}</Text>
+          <Text style={styles.focusText}>{aiRecommendations?.weekly_focus || 'Building consistency and endurance'}</Text>
         </View>
 
         {/* Recommendations */}
         <View style={styles.recommendationsContainer}>
           <Text style={styles.recommendationsTitle}>Personalized Recommendations:</Text>
-          {aiRecommendations.recommendations.map((recommendation, index) => (
+          {(aiRecommendations?.recommendations || []).map((recommendation, index) => (
             <View key={index} style={styles.recommendationItem}>
               <Text style={styles.recommendationText}>• {recommendation}</Text>
             </View>
@@ -317,14 +319,14 @@ const AnalysisView = ({ analysis, aiRecommendations }) => {
         {/* Next Run Tip */}
         <View style={styles.tipContainer}>
           <Text style={styles.tipTitle}>💡 Next Run Tip:</Text>
-          <Text style={styles.tipText}>{aiRecommendations.next_run_tip}</Text>
+          <Text style={styles.tipText}>{aiRecommendations?.next_run_tip || 'Start with a comfortable pace and gradually build up your distance'}</Text>
         </View>
       </View>
     ) : (
       /* Fallback to original recommendations if AI is not available */
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Coach's Recommendations</Text>
-        {analysis.recommendations.map((recommendation, index) => (
+        {(analysis?.recommendations || []).map((recommendation, index) => (
           <View key={index} style={styles.recommendationItem}>
             <Text style={styles.recommendationText}>• {recommendation}</Text>
           </View>
