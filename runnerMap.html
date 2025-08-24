@@ -466,6 +466,8 @@
 
                         }else if (type === 'startFreeRun') {
                             startRun('free', null);
+                        }else if (type === 'startGuidedRun') {
+                            startRun('guided', data);
                         }else if (type === 'startEventRun') {
                             startRun('event', data.data);
                         }else if (type === 'updateEventRunners') {
@@ -783,7 +785,7 @@
             let count = 3;
             runType = type;
 
-            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: runType === 'free' ? 'enterFreeRunMode' : 'enterEventRunMode'}}))
+            window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: (runType === 'free' || runType === 'guided') ? 'enterFreeRunMode' : 'enterEventRunMode'}}));
 
             text.textContent = count;
             const countdownInterval = setInterval(() => {
@@ -832,7 +834,7 @@
                         }));
                     }
 
-                    if (runType === 'event') {
+                    if (runType === 'event' || runType === 'guided') {
                         if (eventData.trackId) showEventTrack(eventData.trackId);
                     }
 
@@ -996,7 +998,7 @@
                 }));
             }
 
-            if (runType === 'event') {
+            if (runType === 'event' || runType === 'guided') {
                 window.ReactNativeWebView.postMessage(JSON.stringify({data: {action: 'endEventRun'}}));
                 clearEventRunState();
             }
