@@ -106,33 +106,73 @@ const CoachingDashboard = ({ userId, profileId }) => {
       setAnalysis(enhancedAnalysis);
 
       // Get AI-powered training plan
-      const planResponse = await fetchWithAuth(
-        'https://runfuncionapp.azurewebsites.net/api/ai-coaching',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            userId: profileId,
-            type: 'training_plan',
-            activities: activities,
-            userProfile: {
-              fitnessLevel: analysisResponse?.analysis?.fitnessLevel || 'beginner',
-              preferences: {
-                maxWeeklyRuns: 4
-              }
+      try {
+        const planResponse = await fetchWithAuth(
+          'https://runfuncionapp.azurewebsites.net/api/ai-coaching',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
             },
-            goals: {
-              targetDistance: 5000 // 5k default
-            }
-          })
-        }
-      );
+            body: JSON.stringify({
+              userId: profileId,
+              type: 'training_plan',
+              activities: activities,
+              userProfile: {
+                fitnessLevel: analysisResponse?.analysis?.fitnessLevel || 'beginner',
+                preferences: {
+                  maxWeeklyRuns: 4
+                }
+              },
+              goals: {
+                targetDistance: 5000 // 5k default
+              }
+            })
+          }
+        );
 
-      console.log('Training Plan Response:', planResponse);
-      console.log('Training Plan Data:', planResponse?.plan || planResponse);
-      setTrainingPlan(planResponse?.plan || planResponse);
+        console.log('Training plan response received:', planResponse);
+        setTrainingPlan(planResponse?.plan || planResponse);
+      } catch (planError) {
+        console.error('Error fetching training plan:', planError);
+        // Set a fallback training plan
+        setTrainingPlan({
+          plan_overview: "We're having trouble generating your personalized plan right now. Here's a basic training plan to get you started.",
+          weekly_plans: [
+            {
+              week: 1,
+              focus: "Getting Started",
+              runs: [
+                {
+                  day: "Monday",
+                  type: "Easy Run",
+                  distance: "2km",
+                  pace: "comfortable",
+                  notes: "Start slow and focus on form"
+                },
+                {
+                  day: "Wednesday",
+                  type: "Easy Run", 
+                  distance: "2km",
+                  pace: "comfortable",
+                  notes: "Same as Monday"
+                },
+                {
+                  day: "Saturday",
+                  type: "Easy Run",
+                  distance: "3km", 
+                  pace: "comfortable",
+                  notes: "Longer run, take breaks if needed"
+                }
+              ],
+              rest_days: ["Tuesday", "Thursday", "Friday", "Sunday"],
+              cross_training: "Light walking on rest days"
+            }
+          ],
+          progression_notes: "Gradually increase distance by 0.5km each week",
+          safety_tips: ["Listen to your body", "Stay hydrated", "Don't increase distance too quickly"]
+        });
+      }
 
     } catch (error) {
       console.error('Error loading coaching data:', error);
@@ -296,23 +336,34 @@ const AnalysisView = ({ analysis, aiRecommendations }) => {
 };
 
 const TrainingPlanView = ({ plan }) => {
-  console.log('TrainingPlanView received plan:', plan);
-  
+  // Handle case where plan data might be missing or malformed
+  if (!plan) {
+    return (
+      <View style={styles.planContainer}>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Training Plan</Text>
+          <Text style={styles.planOverview}>Loading your personalized training plan...</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
   <View style={styles.planContainer}>
     {/* Plan Overview */}
     <View style={styles.card}>
       <Text style={styles.cardTitle}>Your AI-Generated Training Plan</Text>
-      <Text style={styles.planOverview}>{plan.plan_overview}</Text>
+      <Text style={styles.planOverview}>{plan.plan_overview || 'Personalized training plan based on your fitness level and goals.'}</Text>
     </View>
 
     {/* Weekly Plans */}
-    {plan.weekly_plans && plan.weekly_plans.map((weekPlan, weekIndex) => (
+    {plan.weekly_plans && Array.isArray(plan.weekly_plans) && plan.weekly_plans.length > 0 ? (
+      plan.weekly_plans.map((weekPlan, weekIndex) => (
       <View key={weekIndex} style={styles.card}>
         <Text style={styles.cardTitle}>Week {weekPlan.week}: {weekPlan.focus}</Text>
         
         {/* Runs for this week */}
-        {weekPlan.runs && weekPlan.runs.map((run, runIndex) => (
+        {weekPlan.runs && Array.isArray(weekPlan.runs) && weekPlan.runs.map((run, runIndex) => (
           <View key={runIndex} style={styles.runPlanItem}>
             <View style={styles.runPlanHeader}>
               <Text style={styles.runDay}>{run.day}</Text>
@@ -342,7 +393,13 @@ const TrainingPlanView = ({ plan }) => {
           </View>
         )}
       </View>
-    ))}
+    ))
+    ) : (
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Weekly Training Plan</Text>
+        <Text style={styles.planOverview}>Your personalized weekly training plan will be generated based on your fitness level and goals.</Text>
+      </View>
+    )}
 
     {/* Progression Notes */}
     {plan.progression_notes && (
@@ -353,7 +410,7 @@ const TrainingPlanView = ({ plan }) => {
     )}
 
     {/* Safety Tips */}
-    {plan.safety_tips && (
+    {plan.safety_tips && Array.isArray(plan.safety_tips) && (
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Safety Tips</Text>
         {plan.safety_tips.map((tip, index) => (

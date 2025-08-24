@@ -501,7 +501,8 @@
 
     function startLocationSelection() {
         // show the confirm button
-        document.getElementById('confirmLocationBtn').style.display = 'inline';
+        const confirmBtn = document.getElementById('confirmLocationBtn');
+        if (confirmBtn) confirmBtn.style.display = 'inline';
 
         trackingCenter = true;
 
@@ -553,18 +554,21 @@
         }));
 
         // Hide confirm button
-        document.getElementById('confirmLocationBtn').style.display = 'none';
+        const confirmBtn = document.getElementById('confirmLocationBtn');
+        if (confirmBtn) confirmBtn.style.display = 'none';
     }
     function closeEventMenu() {
-        document.getElementById('eventMenu').style.display = 'none';
+        const eventMenu = document.getElementById('eventMenu');
+        if (eventMenu) eventMenu.style.display = 'none';
     }
     function toggleUserMenu() {
         const menu = document.getElementById('userMenu');
-        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+        if (menu) menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
     }
 
     function closeUserMenu() {
-        document.getElementById('userMenu').style.display = 'none';
+        const userMenu = document.getElementById('userMenu');
+        if (userMenu) userMenu.style.display = 'none';
     }
     let trackMarkers = [];
     let trackLineLayers = [];
@@ -749,21 +753,27 @@
 
     function renderMyEventsList() {
         const list = document.getElementById('myEventsList');
+        if (!list) {
+            console.warn('myEventsList element not found');
+            return;
+        }
         list.innerHTML = ''; // Clear existing list
-        window.myEvents.forEach(event => {
-            const li = document.createElement('li');
-            li.textContent = event.name || 'Untitled Event';
-            li.style.cursor = 'pointer';
-            li.onclick = () => {
-            if (map && event.latitude && event.longitude) {
-                map.setCamera({
-                center: [event.longitude, event.latitude],
-                zoom: 15
-                });
-            }
-            };
-            list.appendChild(li);
-        });
+        if (window.myEvents && Array.isArray(window.myEvents)) {
+            window.myEvents.forEach(event => {
+                const li = document.createElement('li');
+                li.textContent = event.name || 'Untitled Event';
+                li.style.cursor = 'pointer';
+                li.onclick = () => {
+                if (map && event.latitude && event.longitude) {
+                    map.setCamera({
+                    center: [event.longitude, event.latitude],
+                    zoom: 15
+                    });
+                }
+                };
+                list.appendChild(li);
+            });
+        }
     }
         // Free Run functionality
         let runType = null;
@@ -781,6 +791,10 @@
         function startRun(type, eventData) {
             const overlay = document.getElementById('countdownOverlay');
             const text = document.getElementById('countdownText');
+            if (!overlay || !text) {
+                console.warn('Countdown elements not found');
+                return;
+            }
             overlay.style.display = 'flex';
             let count = 3;
             runType = type;
@@ -819,9 +833,13 @@
                     updateRunTimer(); // Immediately update UI
                     runTimerInterval = setInterval(updateRunTimer, 1000);
 
-                    document.getElementById('pauseRunBtn').style.display = 'inline';
-                    document.getElementById('stopRunBtn').style.display = 'inline';
-                    document.getElementById('runStats').style.display = 'block';
+                    const pauseBtn = document.getElementById('pauseRunBtn');
+                    const stopBtn = document.getElementById('stopRunBtn');
+                    const runStats = document.getElementById('runStats');
+                    
+                    if (pauseBtn) pauseBtn.style.display = 'inline';
+                    if (stopBtn) stopBtn.style.display = 'inline';
+                    if (runStats) runStats.style.display = 'block';
                     const legend = document.getElementById('legendOverlay');
                     if (legend) legend.style.display = 'none';
 
@@ -873,10 +891,15 @@
             const cal = estimateCalories(distance);
             const spd = speed ? (speed * 3.6).toFixed(1) : '0';
             
-            document.getElementById('runSpeed').textContent = spd;
-            document.getElementById('runDistance').textContent = distance.toFixed(1);
-            document.getElementById('runPace').textContent = pace.toFixed(2);
-            document.getElementById('runCalories').textContent = cal.toFixed(0);
+            const runSpeedEl = document.getElementById('runSpeed');
+            const runDistanceEl = document.getElementById('runDistance');
+            const runPaceEl = document.getElementById('runPace');
+            const runCaloriesEl = document.getElementById('runCalories');
+            
+            if (runSpeedEl) runSpeedEl.textContent = spd;
+            if (runDistanceEl) runDistanceEl.textContent = distance.toFixed(1);
+            if (runPaceEl) runPaceEl.textContent = pace.toFixed(2);
+            if (runCaloriesEl) runCaloriesEl.textContent = cal.toFixed(0);
 
             if (runType === 'event') {
                 window.ReactNativeWebView.postMessage(JSON.stringify({
@@ -890,7 +913,8 @@
 
         function pauseRun() {
             runPaused = !runPaused;
-            document.getElementById('pauseRunBtn').textContent = runPaused ? '▶️' : '⏸️';
+            const pauseBtn = document.getElementById('pauseRunBtn');
+            if (pauseBtn) pauseBtn.textContent = runPaused ? '▶️' : '⏸️';
             if(runPaused){
                 pauseStartTime = new Date();
 
@@ -904,9 +928,13 @@
         function stopRun() {
             runActive = false;
 
-            document.getElementById('pauseRunBtn').style.display = 'none';
-            document.getElementById('stopRunBtn').style.display = 'none';
-            document.getElementById('runStats').style.display = 'none';
+            const pauseBtn = document.getElementById('pauseRunBtn');
+            const stopBtn = document.getElementById('stopRunBtn');
+            const runStats = document.getElementById('runStats');
+            
+            if (pauseBtn) pauseBtn.style.display = 'none';
+            if (stopBtn) stopBtn.style.display = 'none';
+            if (runStats) runStats.style.display = 'none';
             const legend = document.getElementById('legendOverlay');
             if (legend) legend.style.display = 'block';
 
@@ -1026,7 +1054,8 @@
         }
 
         function closeRunSummary() {
-            document.getElementById('runSummary').style.display = 'none';
+            const runSummary = document.getElementById('runSummary');
+            if (runSummary) runSummary.style.display = 'none';
         }
 
         function calculateTotalDistance(coords) {
@@ -1047,8 +1076,11 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('pauseRunBtn').onclick = pauseRun;
-            document.getElementById('stopRunBtn').onclick = stopRun;
+                    const pauseBtn = document.getElementById('pauseRunBtn');
+        const stopBtn = document.getElementById('stopRunBtn');
+        
+        if (pauseBtn) pauseBtn.onclick = pauseRun;
+        if (stopBtn) stopBtn.onclick = stopRun;
         });
 
         function updateRunTimer() {
@@ -1063,7 +1095,8 @@
                 const minutes = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
                 const seconds = String(elapsed % 60).padStart(2, '0');
 
-                document.getElementById('runTime').textContent = `${hours}:${minutes}:${seconds}`;
+                const runTimeEl = document.getElementById('runTime');
+            if (runTimeEl) runTimeEl.textContent = `${hours}:${minutes}:${seconds}`;
         }
 
         // free run ends here
@@ -1179,8 +1212,13 @@
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-            const menuButton = document.getElementById('userMenuButton');
-            const dropdown = document.getElementById('userMenuDropdown');
+                    const menuButton = document.getElementById('userMenuButton');
+        const dropdown = document.getElementById('userMenuDropdown');
+        
+        if (!menuButton || !dropdown) {
+            console.warn('User menu elements not found');
+            return;
+        }
 
             menuButton.addEventListener('click', function(e) {
                 e.stopPropagation();
@@ -1212,6 +1250,10 @@
         function showRunStatusMessage(message, type) {
             // Remove existing message if any
             const existingMessage = document.getElementById('runStatusMessage');
+        if (!existingMessage) {
+            console.warn('runStatusMessage element not found');
+            return;
+        }
             if (existingMessage) {
                 existingMessage.remove();
             }
