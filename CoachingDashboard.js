@@ -106,33 +106,73 @@ const CoachingDashboard = ({ userId, profileId }) => {
       setAnalysis(enhancedAnalysis);
 
       // Get AI-powered training plan
-      const planResponse = await fetchWithAuth(
-        'https://runfuncionapp.azurewebsites.net/api/ai-coaching',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            userId: profileId,
-            type: 'training_plan',
-            activities: activities,
-            userProfile: {
-              fitnessLevel: analysisResponse?.analysis?.fitnessLevel || 'beginner',
-              preferences: {
-                maxWeeklyRuns: 4
-              }
+      try {
+        const planResponse = await fetchWithAuth(
+          'https://runfuncionapp.azurewebsites.net/api/ai-coaching',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
             },
-            goals: {
-              targetDistance: 5000 // 5k default
-            }
-          })
-        }
-      );
+            body: JSON.stringify({
+              userId: profileId,
+              type: 'training_plan',
+              activities: activities,
+              userProfile: {
+                fitnessLevel: analysisResponse?.analysis?.fitnessLevel || 'beginner',
+                preferences: {
+                  maxWeeklyRuns: 4
+                }
+              },
+              goals: {
+                targetDistance: 5000 // 5k default
+              }
+            })
+          }
+        );
 
-      console.log('Training Plan Response:', planResponse);
-      console.log('Training Plan Data:', planResponse?.plan || planResponse);
-      setTrainingPlan(planResponse?.plan || planResponse);
+        console.log('Training plan response received:', planResponse);
+        setTrainingPlan(planResponse?.plan || planResponse);
+      } catch (planError) {
+        console.error('Error fetching training plan:', planError);
+        // Set a fallback training plan
+        setTrainingPlan({
+          plan_overview: "We're having trouble generating your personalized plan right now. Here's a basic training plan to get you started.",
+          weekly_plans: [
+            {
+              week: 1,
+              focus: "Getting Started",
+              runs: [
+                {
+                  day: "Monday",
+                  type: "Easy Run",
+                  distance: "2km",
+                  pace: "comfortable",
+                  notes: "Start slow and focus on form"
+                },
+                {
+                  day: "Wednesday",
+                  type: "Easy Run", 
+                  distance: "2km",
+                  pace: "comfortable",
+                  notes: "Same as Monday"
+                },
+                {
+                  day: "Saturday",
+                  type: "Easy Run",
+                  distance: "3km", 
+                  pace: "comfortable",
+                  notes: "Longer run, take breaks if needed"
+                }
+              ],
+              rest_days: ["Tuesday", "Thursday", "Friday", "Sunday"],
+              cross_training: "Light walking on rest days"
+            }
+          ],
+          progression_notes: "Gradually increase distance by 0.5km each week",
+          safety_tips: ["Listen to your body", "Stay hydrated", "Don't increase distance too quickly"]
+        });
+      }
 
     } catch (error) {
       console.error('Error loading coaching data:', error);
@@ -195,13 +235,13 @@ const AnalysisView = ({ analysis, aiRecommendations }) => {
     <View style={styles.card}>
       <Text style={styles.cardTitle}>Your Fitness Level</Text>
       <View style={styles.fitnessLevelContainer}>
-        <View style={[styles.levelBadge, { backgroundColor: getFitnessLevelColor(analysis.fitnessLevel) }]}>
-          <Text style={styles.levelText}>{analysis.fitnessLevel.toUpperCase()}</Text>
+        <View style={[styles.levelBadge, { backgroundColor: getFitnessLevelColor(analysis?.fitnessLevel || 'beginner') }]}>
+          <Text style={styles.levelText}>{(analysis?.fitnessLevel || 'beginner').toUpperCase()}</Text>
         </View>
         <Text style={styles.levelDescription}>
-          {analysis.fitnessLevel === 'beginner' && 'Great start! Focus on building consistency and endurance.'}
-          {analysis.fitnessLevel === 'intermediate' && 'You\'re making good progress! Ready for more structured training.'}
-          {analysis.fitnessLevel === 'advanced' && 'Excellent! You\'re ready for advanced training techniques.'}
+          {(analysis?.fitnessLevel || 'beginner') === 'beginner' && 'Great start! Focus on building consistency and endurance.'}
+          {(analysis?.fitnessLevel || 'beginner') === 'intermediate' && 'You\'re making good progress! Ready for more structured training.'}
+          {(analysis?.fitnessLevel || 'beginner') === 'advanced' && 'Excellent! You\'re ready for advanced training techniques.'}
         </Text>
       </View>
     </View>
@@ -211,19 +251,21 @@ const AnalysisView = ({ analysis, aiRecommendations }) => {
       <Text style={styles.cardTitle}>Your Stats</Text>
       <View style={styles.metricsGrid}>
         <View style={styles.metricItem}>
-          <Text style={styles.metricValue}>{(analysis.metrics.totalDistance / 1000).toFixed(1)}</Text>
+          <Text style={styles.metricValue}>
+            {analysis?.metrics?.totalDistance ? (analysis.metrics.totalDistance / 1000).toFixed(1) : '0.0'}
+          </Text>
           <Text style={styles.metricLabel}>Total km</Text>
         </View>
         <View style={styles.metricItem}>
-          <Text style={styles.metricValue}>{analysis.metrics.totalRuns}</Text>
+          <Text style={styles.metricValue}>{analysis?.metrics?.totalRuns || 0}</Text>
           <Text style={styles.metricLabel}>Total runs</Text>
         </View>
         <View style={styles.metricItem}>
-          <Text style={styles.metricValue}>{analysis.metrics.averagePace || 'N/A'}</Text>
+          <Text style={styles.metricValue}>{analysis?.metrics?.averagePace || 'N/A'}</Text>
           <Text style={styles.metricLabel}>Avg pace</Text>
         </View>
         <View style={styles.metricItem}>
-          <Text style={styles.metricValue}>{analysis.metrics.weeklyAverage}</Text>
+          <Text style={styles.metricValue}>{analysis?.metrics?.weeklyAverage || 0}</Text>
           <Text style={styles.metricLabel}>Runs/week</Text>
         </View>
       </View>
@@ -235,14 +277,14 @@ const AnalysisView = ({ analysis, aiRecommendations }) => {
       <View style={styles.indicatorContainer}>
         <View style={styles.indicator}>
           <Text style={styles.indicatorLabel}>Consistency</Text>
-          <View style={[styles.indicatorBadge, { backgroundColor: getConsistencyColor(analysis.consistency) }]}>
-            <Text style={styles.indicatorText}>{analysis.consistency}</Text>
+          <View style={[styles.indicatorBadge, { backgroundColor: getConsistencyColor(analysis?.consistency || 'low') }]}>
+            <Text style={styles.indicatorText}>{analysis?.consistency || 'low'}</Text>
           </View>
         </View>
         <View style={styles.indicator}>
           <Text style={styles.indicatorLabel}>Progress</Text>
-          <View style={[styles.indicatorBadge, { backgroundColor: getProgressColor(analysis.progress) }]}>
-            <Text style={styles.indicatorText}>{analysis.progress}</Text>
+          <View style={[styles.indicatorBadge, { backgroundColor: getProgressColor(analysis?.progress || 'stable') }]}>
+            <Text style={styles.indicatorText}>{analysis?.progress || 'stable'}</Text>
           </View>
         </View>
       </View>
@@ -255,19 +297,19 @@ const AnalysisView = ({ analysis, aiRecommendations }) => {
         
         {/* Motivational Message */}
         <View style={styles.motivationalContainer}>
-          <Text style={styles.motivationalText}>{aiRecommendations.motivational_message}</Text>
+          <Text style={styles.motivationalText}>{aiRecommendations?.motivational_message || 'Keep up the great work!'}</Text>
         </View>
 
         {/* Weekly Focus */}
         <View style={styles.focusContainer}>
           <Text style={styles.focusTitle}>This Week's Focus:</Text>
-          <Text style={styles.focusText}>{aiRecommendations.weekly_focus}</Text>
+          <Text style={styles.focusText}>{aiRecommendations?.weekly_focus || 'Building consistency and endurance'}</Text>
         </View>
 
         {/* Recommendations */}
         <View style={styles.recommendationsContainer}>
           <Text style={styles.recommendationsTitle}>Personalized Recommendations:</Text>
-          {aiRecommendations.recommendations.map((recommendation, index) => (
+          {(aiRecommendations?.recommendations || []).map((recommendation, index) => (
             <View key={index} style={styles.recommendationItem}>
               <Text style={styles.recommendationText}>• {recommendation}</Text>
             </View>
@@ -277,14 +319,14 @@ const AnalysisView = ({ analysis, aiRecommendations }) => {
         {/* Next Run Tip */}
         <View style={styles.tipContainer}>
           <Text style={styles.tipTitle}>💡 Next Run Tip:</Text>
-          <Text style={styles.tipText}>{aiRecommendations.next_run_tip}</Text>
+          <Text style={styles.tipText}>{aiRecommendations?.next_run_tip || 'Start with a comfortable pace and gradually build up your distance'}</Text>
         </View>
       </View>
     ) : (
       /* Fallback to original recommendations if AI is not available */
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Coach's Recommendations</Text>
-        {analysis.recommendations.map((recommendation, index) => (
+        {(analysis?.recommendations || []).map((recommendation, index) => (
           <View key={index} style={styles.recommendationItem}>
             <Text style={styles.recommendationText}>• {recommendation}</Text>
           </View>
@@ -296,23 +338,34 @@ const AnalysisView = ({ analysis, aiRecommendations }) => {
 };
 
 const TrainingPlanView = ({ plan }) => {
-  console.log('TrainingPlanView received plan:', plan);
-  
+  // Handle case where plan data might be missing or malformed
+  if (!plan) {
+    return (
+      <View style={styles.planContainer}>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Training Plan</Text>
+          <Text style={styles.planOverview}>Loading your personalized training plan...</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
   <View style={styles.planContainer}>
     {/* Plan Overview */}
     <View style={styles.card}>
       <Text style={styles.cardTitle}>Your AI-Generated Training Plan</Text>
-      <Text style={styles.planOverview}>{plan.plan_overview}</Text>
+      <Text style={styles.planOverview}>{plan.plan_overview || 'Personalized training plan based on your fitness level and goals.'}</Text>
     </View>
 
     {/* Weekly Plans */}
-    {plan.weekly_plans && plan.weekly_plans.map((weekPlan, weekIndex) => (
+    {plan.weekly_plans && Array.isArray(plan.weekly_plans) && plan.weekly_plans.length > 0 ? (
+      plan.weekly_plans.map((weekPlan, weekIndex) => (
       <View key={weekIndex} style={styles.card}>
         <Text style={styles.cardTitle}>Week {weekPlan.week}: {weekPlan.focus}</Text>
         
         {/* Runs for this week */}
-        {weekPlan.runs && weekPlan.runs.map((run, runIndex) => (
+        {weekPlan.runs && Array.isArray(weekPlan.runs) && weekPlan.runs.map((run, runIndex) => (
           <View key={runIndex} style={styles.runPlanItem}>
             <View style={styles.runPlanHeader}>
               <Text style={styles.runDay}>{run.day}</Text>
@@ -342,7 +395,13 @@ const TrainingPlanView = ({ plan }) => {
           </View>
         )}
       </View>
-    ))}
+    ))
+    ) : (
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Weekly Training Plan</Text>
+        <Text style={styles.planOverview}>Your personalized weekly training plan will be generated based on your fitness level and goals.</Text>
+      </View>
+    )}
 
     {/* Progression Notes */}
     {plan.progression_notes && (
@@ -353,7 +412,7 @@ const TrainingPlanView = ({ plan }) => {
     )}
 
     {/* Safety Tips */}
-    {plan.safety_tips && (
+    {plan.safety_tips && Array.isArray(plan.safety_tips) && (
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Safety Tips</Text>
         {plan.safety_tips.map((tip, index) => (

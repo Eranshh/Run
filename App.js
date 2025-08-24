@@ -314,7 +314,7 @@ function MainScreen({ navigation, username, userId, userToken, route, connection
       console.log('Event list:', eventList);
       webViewRef.current.postMessage(JSON.stringify(eventList));
     } catch (error) {
-      console.error('Error fetching events:', error);
+      console.log('Error fetching events:', error);
       // Handle error appropriately
     }
   };
@@ -341,7 +341,7 @@ function MainScreen({ navigation, username, userId, userToken, route, connection
     webViewRef.current.postMessage(JSON.stringify(myEventsList));
     
   } catch (error) {
-    console.error('Error fetching user events:', error);
+    console.log('Error fetching user events:', error);
     // Handle error appropriately
   }
 };
@@ -355,7 +355,7 @@ const getAllTracks = async () => {
       setTracks(trackIds);
       webViewRef.current.postMessage(JSON.stringify({'type': "tracks", 'tracks': data}));
     } catch (error) {
-      console.error('Error fetching tracks:', error);
+      console.log('Error fetching tracks:', error);
       // Handle error appropriately
     }
   };
