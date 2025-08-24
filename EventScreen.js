@@ -160,7 +160,7 @@ export default function EventScreen({ navigation, userId, connection }) {
 
     const handleDelete = () => {
         deleteEvent(eventId);
-        navigation.popToTop();
+        navigation.navigate('mainMap');
     }
     
     const handleLeaveEvent = async () => {
