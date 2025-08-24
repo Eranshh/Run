@@ -531,7 +531,7 @@ const getAllTracks = async () => {
         // Enter event run
         setMode("eventRun");
         // Navigate to main map to ensure we're on the correct screen
-        navigation.navigate("mainMap");
+        navigation.popToTop();
         
         // Notify WebView to start event run (only if WebView is ready)
         if (webViewRef.current && mapReady) {
