@@ -418,20 +418,27 @@
                         else if (type === 'userLocation') {
                             const { location } = data;
                             
+                            // Validate coordinates before using them
+                            const { latitude, longitude } = location.coords;
+                            if (isNaN(latitude) || isNaN(longitude) || latitude === null || longitude === null || latitude === undefined || longitude === undefined) {
+                                console.warn('Invalid user location coordinates:', { latitude, longitude });
+                                return;
+                            }
+                            
                             if (runActive) {
                                 runLoc(location);
                             }
 
                             if (!window.userMarker) {
                                 window.userMarker = new atlas.HtmlMarker({
-                                    position: [location.coords.longitude, location.coords.latitude],
+                                    position: [longitude, latitude],
                                     text: '🧍',
                                     color: '#2ecc71'
                                 });
                                 map.markers.add(window.userMarker);
                             } else {
                                 window.userMarker.setOptions({
-                                    position: [location.coords.longitude, location.coords.latitude]
+                                    position: [longitude, latitude]
                                 });
                             }
                         }else if (type === "startSelectingLocation"){
@@ -677,9 +684,24 @@
 
     function drawPath(track) {
         let path = track.path || [];
+        
+        // Filter out invalid coordinates (NaN, null, undefined)
+        const validPath = path.filter(point => {
+            if (!Array.isArray(point) || point.length < 2) {
+                return false;
+            }
+            const [lng, lat] = point;
+            return !isNaN(lng) && !isNaN(lat) && lng !== null && lat !== null && lng !== undefined && lat !== undefined;
+        });
+
+        if (validPath.length === 0) {
+            console.warn('No valid coordinates found in track path');
+            return;
+        }
+
         try{
             const marker = new atlas.HtmlMarker({
-                position: path[0],
+                position: validPath[0],
                 text: '🏁',
                 color: '#e67e22',
                 visible: false
@@ -689,7 +711,7 @@
             
             map.markers.add(marker);
             // Create a LineString geometry
-            const line = new atlas.data.LineString(path);
+            const line = new atlas.data.LineString(validPath);
             const feature = new atlas.data.Feature(line);
             
             // Create a DataSource and add the line feature to it
@@ -827,6 +849,12 @@
             if (!runActive || runPaused) return;
 
             const { latitude, longitude, altitude, speed, heading } = location.coords;
+            
+            // Validate coordinates before adding to path
+            if (isNaN(latitude) || isNaN(longitude) || latitude === null || longitude === null || latitude === undefined || longitude === undefined) {
+                console.warn('Invalid coordinates received:', { latitude, longitude });
+                return;
+            }
             
             // Filter out 0 values as they usually indicate no altitude data
             const validAltitude = (altitude && altitude !== 0 && !isNaN(altitude)) ? altitude : null;
