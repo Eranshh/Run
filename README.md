@@ -3,6 +3,7 @@
 A comprehensive running and fitness tracking mobile application built with React Native and Expo. The app enables users to create running events, track their runs, connect with friends, and receive AI-powered coaching.
 
 Has a Wear-OS companion app at https://github.com/Tomer-Zur/Run-wearOS
+
 Backend at https://github.com/avivjan/Run
 
 ## Features
