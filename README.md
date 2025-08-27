@@ -2,6 +2,9 @@
 
 A comprehensive running and fitness tracking mobile application built with React Native and Expo. The app enables users to create running events, track their runs, connect with friends, and receive AI-powered coaching.
 
+Has a Wear-OS companion app at https://github.com/Tomer-Zur/Run-wearOS
+Backend at https://github.com/avivjan/Run
+
 ## Features
 
 ### 🏃‍♂️ Running & Tracking
@@ -48,7 +51,7 @@ A comprehensive running and fitness tracking mobile application built with React
 - **Azure Storage** - Cloud storage for content such as run data, user and event information
 - **Azure OpenAI** - AI-powered coaching, training plan generation, and performance analytics
 
-## Project Structure
+## Project Structure - Frontend
 
 ```
 run/run/
